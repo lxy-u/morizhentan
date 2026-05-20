@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>末日侦探社 · 躺平公寓 防守</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-user-select:none}
+  html,body{width:100%;height:100%;overflow:hidden;background:#06070a;color:#d6d2c8;
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",serif}
+  #wrap{position:fixed;inset:0}
+  canvas{display:block;cursor:grab;touch-action:none}
+  canvas.dragging{cursor:grabbing}
+  canvas.building{cursor:crosshair}
+
+  /* 顶部 HUD */
+  .topbar{position:fixed;top:0;left:0;right:0;z-index:10;
+    background:linear-gradient(180deg,rgba(6,7,10,.96),rgba(6,7,10,0));
+    padding:14px 18px 22px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;
+    font-size:13px;pointer-events:none;letter-spacing:1px}
+  .topbar > *{pointer-events:auto}
+  .res{display:flex;align-items:center;gap:6px;
+    background:rgba(20,18,16,.85);border:1px solid rgba(180,140,80,.18);
+    border-radius:2px;padding:7px 12px;
+    box-shadow:inset 0 1px 0 rgba(255,220,170,.06),0 2px 8px rgba(0,0,0,.5)}
+  .res .lbl{color:#8a8278;font-size:11px}
+  .res .val{color:#e8d9b7;font-weight:600;font-variant-numeric:tabular-nums;min-width:36px;text-align:right}
+  .res .rate{color:#6f9c6f;font-size:10px}
+  .res.power .val{color:#8ad0ff}
+  .clock{margin-left:auto;color:#7a6f5e;font-size:11px;
+    background:rgba(20,18,16,.85);border:1px solid rgba(180,140,80,.12);
+    padding:7px 12px;border-radius:2px}
+  .clock .day{color:#c0a474}
+  .clock.alert{border-color:#9a3030;color:#ff9090}
+  .clock.alert .day{color:#ff7070}
+
+  /* 波次警示 */
+  .wave-warn{position:fixed;left:50%;top:70px;transform:translateX(-50%);
+    background:rgba(80,20,20,.85);border:1px solid rgba(220,80,80,.5);
+    color:#ffb0b0;padding:8px 22px;font-size:12px;letter-spacing:4px;
+    border-radius:2px;z-index:8;opacity:0;transition:opacity .3s}
+  .wave-warn.show{opacity:1}
+  .wave-warn .target{color:#ffe070;margin-left:8px}
+
+  /* 建造菜单(浮动) */
+  .bmenu{position:fixed;z-index:30;background:rgba(14,12,10,.96);
+    border:1px solid rgba(180,140,80,.4);border-radius:4px;
+    padding:8px;display:flex;gap:6px;
+    box-shadow:0 8px 32px rgba(0,0,0,.7), 0 0 0 1px rgba(0,0,0,.5);
+    transform:translate(-50%,-100%) translateY(-12px);pointer-events:auto}
+  .bmenu::after{content:'';position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);
+    width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;
+    border-top:7px solid rgba(180,140,80,.4)}
+  .bm-item{width:54px;padding:8px 4px;background:rgba(28,24,20,.9);
+    border:1px solid rgba(180,140,80,.2);border-radius:2px;text-align:center;
+    cursor:pointer;transition:all .12s}
+  .bm-item:hover{border-color:#c0a474;background:rgba(60,46,28,.9);transform:translateY(-2px)}
+  .bm-item.cant{opacity:.4;cursor:not-allowed}
+  .bm-ico{font-size:20px;line-height:1}
+  .bm-name{font-size:10px;color:#c0c0b8;margin-top:3px;letter-spacing:1px}
+  .bm-cost{font-size:9px;color:#c0a474;margin-top:2px}
+  .bm-cost.cant{color:#9a5a5a}
+
+  /* 浮字 */
+  .float-num{position:fixed;pointer-events:none;font-weight:600;
+    text-shadow:0 0 8px rgba(0,0,0,.8);z-index:15;
+    animation:float-up 1.4s ease-out forwards}
+  .float-num.gain{color:#e8d186}
+  .float-num.dmg{color:#ff7070}
+  .float-num.heal{color:#86e89c}
+  @keyframes float-up{0%{opacity:0;transform:translate(-50%,0)}20%{opacity:1}100%{opacity:0;transform:translate(-50%,-46px)}}
+
+  /* 提示 */
+  .tip{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);
+    background:rgba(20,18,16,.85);padding:7px 16px;border-radius:2px;
+    border:1px solid rgba(180,140,80,.15);
+    font-size:11px;color:#8a7860;letter-spacing:2px;z-index:5;text-align:center}
+  .tip kbd{color:#c0a474}
+
+  /* GameOver */
+  .game-over{position:fixed;inset:0;background:rgba(0,0,0,.9);
+    display:none;flex-direction:column;align-items:center;justify-content:center;z-index:50}
+  .game-over.show{display:flex}
+  .game-over h1{font-size:42px;color:#c43030;letter-spacing:10px;text-shadow:0 0 30px #ff4040;margin-bottom:16px}
+  .game-over p{color:#b0a89c;margin-bottom:24px;letter-spacing:2px}
+  .game-over button{padding:10px 26px;background:#c0a474;color:#1a1a1a;border:none;
+    cursor:pointer;letter-spacing:4px;font-size:13px;font-weight:600;border-radius:2px}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+
+  <div class="topbar">
+    <div class="res"><span class="lbl">$</span><span class="val" id="r-money">0</span><span class="rate" id="r-money-rate">+0/s</span></div>
+    <div class="res power"><span class="lbl">⚡</span><span class="val" id="r-power">0</span><span class="rate" id="r-power-bal">0/0</span></div>
+    <div class="clock" id="clock">
+      <span class="day" id="cl-day">Day 1</span> · <span id="cl-time">06:42</span> · <span id="cl-phase">清晨</span>
+    </div>
+  </div>
+
+  <div class="wave-warn" id="wave-warn">第 <span id="ww-n">1</span> 波来袭<span class="target">→ <span id="ww-t">老周</span></span></div>
+
+  <div class="tip">拖拽平移 · 滚轮缩放 · 点击屋外 <kbd>建造槽</kbd> 添加设备</div>
+
+  <div class="game-over" id="game-over">
+    <h1>沦陷</h1>
+    <p id="go-stats">坚守了 0 波 · 击杀 0 只</p>
+    <button onclick="location.reload()">重 来</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   末日侦探社 · 躺平公寓防守 demo
+   5 间风格不同的房子 · 围着房子的建造槽 · 丧尸轮番来袭
+   ===================================================================== */
+
+const CV  = document.getElementById('cv');
+const CTX = CV.getContext('2d');
+let DPR   = Math.min(window.devicePixelRatio || 1, 2);
+function fitCanvas(){
+  CV.width = innerWidth*DPR; CV.height = innerHeight*DPR;
+  CV.style.width = innerWidth+'px'; CV.style.height = innerHeight+'px';
+  CTX.setTransform(DPR,0,0,DPR,0,0);
+}
+addEventListener('resize', fitCanvas); fitCanvas();
+
+const TAU = Math.PI*2;
+const rnd = (a,b)=>a+Math.random()*(b-a);
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const dist2 = (ax,ay,bx,by)=>{const dx=ax-bx,dy=ay-by;return dx*dx+dy*dy};
+
+/* ----------------------------- 摄像机 ----------------------------- */
+const VIEW = { x: 0, y: 80, scale: 0.85 };
+function w2s(x,y){return{x:innerWidth/2+(x-VIEW.x)*VIEW.scale,y:innerHeight/2+(y-VIEW.y)*VIEW.scale}}
+function s2w(x,y){return{x:(x-innerWidth/2)/VIEW.scale+VIEW.x,y:(y-innerHeight/2)/VIEW.scale+VIEW.y}}
+
+/* ----------------------------- 状态 ----------------------------- */
+const STATE = {
+  money: 200,
+  powerGen: 0,
+  powerUse: 0,
+  alive: true,
+  wave: 0,
+  kills: 0,
+  targetHouseIdx: 0,        // 当前丧尸轮训的目标
+  waveTimer: 12,             // 下次刷怪倒计时
+  inWave: false,
+  zombieToSpawn: 0,
+  spawnTimer: 0,
+};
+const TIME = { day:1, mins: 6*60+42, speed: 60 };
+function clockText(){const h=Math.floor(TIME.mins/60),m=Math.floor(TIME.mins)%60;return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}
+function phaseText(){const h=(TIME.mins/60)%24;return h<5?'深夜':h<8?'清晨':h<11?'上午':h<14?'正午':h<18?'下午':h<21?'黄昏':'夜晚'}
+
+/* ----------------------------- 房间 ----------------------------- */
+const ROOMS = [
+  { id:'zhou', name:'老周', title:'工程师',
+    x:-360, y:-160, w:230, h:170,
+    wall:'#3a3026', floor:'#1d1814', floorPattern:'plank', accent:'#a06030',
+    hp:120, hpMax:120,
+    portrait:{skin:'#c0a08a', hair:'#3a2418', shirt:'#5a4030', acc:'#a06030'},
+    bedPos:[-55,-10], lampGlow:[-75,-38],
+    furniture:[
+      ['bed',-55,-10,90,50,'#5a3a22'],
+      ['lamp',-75,-38,0,0,'#ffd76b'],
+      ['rug',20,30,110,70,'#3a1f12'],
+      ['bench',20,-45,110,30,'#2a1f16',{detail:'tools'}],
+      ['shelf',85,25,20,90,'#2a1f16',{detail:'parts'}],
+      ['crate',-90,55,26,26,'#3a2818'],
+      ['crate',-65,60,22,22,'#3a2818'],
+      ['drawer',70,-70,50,18,'#3a2618'],
+    ],
+  },
+  { id:'wan', name:'小婉', title:'黑客',
+    x:-70, y:-180, w:230, h:170,
+    wall:'#1a1f2a', floor:'#0c1014', floorPattern:'concrete', accent:'#4a8aff',
+    hp:90, hpMax:90,
+    portrait:{skin:'#d0b0a0', hair:'#1a1a26', shirt:'#2a2a40', acc:'#4a8aff'},
+    bedPos:[-50,30], lampGlow:null, monitorGlow:true,
+    furniture:[
+      ['bed',-50,30,85,45,'#2a2a3a'],
+      ['rug',10,35,100,75,'#10141c'],
+      ['desk',30,-45,130,32,'#181c24'],
+      ['cpu',-10,-55,20,16,'#2a2e36',{glow:'#4a8aff'}],
+      ['cpu',35,-55,20,16,'#2a2e36',{glow:'#ff6ba6'}],
+      ['cpu',80,-55,20,16,'#2a2e36',{glow:'#6affaa'}],
+      ['cable',-85,-10,0,0,'#1a1f2a'],
+      ['poster',-80,-55,30,35,'#3a1f3a'],
+      ['can',80,5,10,12,'#aa3030'],
+      ['can',93,5,10,12,'#3a8aff'],
+    ],
+  },
+  { id:'chen', name:'陈姐', title:'医生',
+    x:220, y:-160, w:230, h:170,
+    wall:'#2e3a3e', floor:'#1a2024', floorPattern:'tile', accent:'#a8d8d0',
+    hp:100, hpMax:100,
+    portrait:{skin:'#e0c8b0', hair:'#5a3a26', shirt:'#e6eaec', acc:'#a8d8d0'},
+    bedPos:[-50,-15], lampGlow:[-78,-40],
+    furniture:[
+      ['bed',-50,-15,90,50,'#d8dcde'],
+      ['lamp',-78,-40,0,0,'#fff4d8'],
+      ['cabinet',60,-45,50,35,'#2a3236',{detail:'meds'}],
+      ['stand',60,30,18,18,'#3a4246'],
+      ['xray',-10,-60,40,30,'#1a2024',{glow:'#a8d8d0'}],
+      ['stool',-10,40,18,18,'#2a3236'],
+      ['crate',80,55,24,24,'#3a4246'],
+    ],
+  },
+  { id:'ma', name:'马哥', title:'老兵',
+    x:-220, y:140, w:230, h:170,
+    wall:'#2a2620', floor:'#181410', floorPattern:'concrete', accent:'#c46a30',
+    hp:140, hpMax:140,
+    portrait:{skin:'#b89878', hair:'#1a1612', shirt:'#3a3a26', acc:'#c46a30'},
+    bedPos:[-60,0], lampGlow:null,
+    furniture:[
+      ['bed',-60,0,85,45,'#3a3024'],
+      ['rack',45,-50,70,22,'#1a1612',{detail:'guns'}],
+      ['crate',-90,55,28,28,'#2a2218'],
+      ['crate',-58,60,24,24,'#2a2218'],
+      ['crate',-28,58,22,22,'#2a2218'],
+      ['radio',75,20,30,22,'#1a1612',{glow:'#c46a30'}],
+      ['boots',60,-10,22,12,'#1a1410'],
+      ['flag',85,-55,4,30,'#5a3022'],
+    ],
+  },
+  { id:'li', name:'丽姨', title:'灶屋大姐',
+    x:130, y:140, w:230, h:170,
+    wall:'#3a2418', floor:'#1f1410', floorPattern:'tile', accent:'#e88a3a',
+    hp:110, hpMax:110,
+    portrait:{skin:'#d8b896', hair:'#3a2218', shirt:'#8a4830', acc:'#e88a3a'},
+    bedPos:[-70,20], lampGlow:[30,-50],
+    furniture:[
+      ['bed',-70,20,80,45,'#5a3022'],
+      ['stove',30,-50,60,30,'#1a1410',{glow:'#e88a3a'}],
+      ['counter',95,-45,55,30,'#2a1f16'],
+      ['table',-10,55,60,40,'#3a2418'],
+      ['chair',-30,80,16,16,'#2a1810'],
+      ['chair',10,80,16,16,'#2a1810'],
+      ['shelf',95,25,20,60,'#2a1a12',{detail:'herbs'}],
+      ['pot',45,-50,16,16,'#1a1410'],
+      ['hanging',-20,-78,80,6,'#1a1410',{detail:'herbs'}],
+    ],
+  },
+];
+
+/* 每间房子四周生成建造槽 (上/下/左/右各 2 个) */
+const SLOTS = [];
+function genSlots(){
+  for (const r of ROOMS){
+    const hw = r.w/2, hh = r.h/2;
+    const pad = 28;
+    // 上排 (在屋顶外侧)
+    SLOTS.push({rid:r.id, x:r.x - hw*0.5, y:r.y - hh - pad, device:null});
+    SLOTS.push({rid:r.id, x:r.x + hw*0.5, y:r.y - hh - pad, device:null});
+    // 下排
+    SLOTS.push({rid:r.id, x:r.x - hw*0.5, y:r.y + hh + pad, device:null});
+    SLOTS.push({rid:r.id, x:r.x + hw*0.5, y:r.y + hh + pad, device:null});
+    // 左侧
+    SLOTS.push({rid:r.id, x:r.x - hw - pad, y:r.y, device:null});
+    // 右侧
+    SLOTS.push({rid:r.id, x:r.x + hw + pad, y:r.y, device:null});
+  }
+}
+genSlots();
+
+/* ----------------------------- 设备 ----------------------------- */
+const DEVICES = {
+  printer: {
+    key:'printer', name:'印钞机', ico:'💰', color:'#ffd76b',
+    cost:80, power:2,
+    desc:'+$1.5/s',
+    moneyGen:1.5,
+  },
+  wall: {
+    key:'wall', name:'路障', ico:'🛡️', color:'#8a7050',
+    cost:30, power:0,
+    desc:'阻挡丧尸',
+    hp:200, blocks:true,
+  },
+  turret: {
+    key:'turret', name:'哨戒炮', ico:'🔫', color:'#7ad3ff',
+    cost:120, power:5,
+    desc:'自动开火',
+    hp:60, range:170, fireRate:0.5, dmg:14, projSpeed:540,
+  },
+  med: {
+    key:'med', name:'急救箱', ico:'❤️', color:'#ff5a5a',
+    cost:100, power:3,
+    desc:'+附近房屋血',
+    hp:40, range:80, healRate:3.5, // hp/s
+  },
+  power: {
+    key:'power', name:'发电机', ico:'⚡', color:'#ffaa3a',
+    cost:60, power:0,
+    desc:'+10⚡',
+    hp:50, powerGen:10,
+  },
+};
+const DEV_LIST = ['printer','wall','turret','med','power'];
+
+const PLACED = [];              // 实际建好的设备(每个槽位最多 1 个)
+const ZOMBIES = [];
+const BULLETS = [];
+const PARTICLES = [];
+const FX = [];                  // 闪光/血溅之类
+
+/* ----------------------------- 资源计算 ----------------------------- */
+function recalcPower(){
+  let gen = 0, use = 0;
+  for (const p of PLACED){
+    const d = DEVICES[p.type];
+    if (d.powerGen) gen += d.powerGen;
+    if (d.power) use += d.power;
+  }
+  STATE.powerGen = gen; STATE.powerUse = use;
+}
+function moneyRate(){
+  if (STATE.powerUse > STATE.powerGen) return 0;
+  let r = 0;
+  for (const p of PLACED){
+    const d = DEVICES[p.type];
+    if (d.moneyGen) r += d.moneyGen;
+  }
+  return r;
+}
+
+/* ----------------------------- 主循环 ----------------------------- */
+let lastT = performance.now();
+let floatTimer = 0;
+function tick(now){
+  const dt = Math.min((now-lastT)/1000, 0.1);
+  lastT = now;
+  if (STATE.alive) update(dt);
+  draw();
+  refreshHUD();
+  requestAnimationFrame(tick);
+}
+
+function update(dt){
+  TIME.mins += dt * TIME.speed;
+  if (TIME.mins >= 24*60){ TIME.mins -= 24*60; TIME.day++; }
+
+  // 收入
+  const powered = STATE.powerUse <= STATE.powerGen;
+  STATE.money += moneyRate() * dt;
+
+  // 钱浮字 (节流)
+  floatTimer += dt;
+  if (floatTimer > 1.6 && moneyRate() > 0){
+    floatTimer = 0;
+    const printers = PLACED.filter(p=>p.type==='printer');
+    if (printers.length){
+      const p = printers[Math.floor(Math.random()*printers.length)];
+      spawnFloat(p.x, p.y - 20, '+$' + (moneyRate()*1.6).toFixed(1), 'gain');
+    }
+  }
+
+  // 波次系统
+  STATE.waveTimer -= dt;
+  if (!STATE.inWave && STATE.waveTimer <= 0){
+    startWave();
+  }
+  if (STATE.inWave){
+    STATE.spawnTimer -= dt;
+    if (STATE.zombieToSpawn > 0 && STATE.spawnTimer <= 0){
+      spawnZombie();
+      STATE.zombieToSpawn--;
+      STATE.spawnTimer = rnd(0.6, 1.1);
+    }
+    if (STATE.zombieToSpawn <= 0 && ZOMBIES.length === 0){
+      // 波次结束
+      STATE.inWave = false;
+      STATE.waveTimer = 12 + Math.min(STATE.wave, 6);
+      STATE.targetHouseIdx = (STATE.targetHouseIdx + 1) % ROOMS.length;
+      STATE.money += 30 + STATE.wave * 8;
+      spawnFloat(ROOMS[STATE.targetHouseIdx].x, ROOMS[STATE.targetHouseIdx].y, '+$' + (30 + STATE.wave*8), 'gain');
+    }
+  }
+
+  // 设备行为
+  for (const p of PLACED){
+    const d = DEVICES[p.type];
+    p.cd = (p.cd || 0) - dt;
+
+    if (d.fireRate && powered){
+      // 寻找最近的丧尸
+      let best=null, bestD2=d.range*d.range;
+      for (const z of ZOMBIES){
+        const dd = dist2(p.x,p.y,z.x,z.y);
+        if (dd<bestD2){ bestD2=dd; best=z; }
+      }
+      if (best){
+        p.angle = Math.atan2(best.y - p.y, best.x - p.x);
+        if (p.cd <= 0){
+          p.cd = d.fireRate;
+          p.flash = 0.08;
+          BULLETS.push({
+            x:p.x, y:p.y,
+            vx:Math.cos(p.angle)*d.projSpeed,
+            vy:Math.sin(p.angle)*d.projSpeed,
+            dmg:d.dmg, life:1.0, color:d.color,
+          });
+        }
+      }
+      if (p.flash > 0) p.flash -= dt;
+    }
+
+    if (d.healRate && powered){
+      // 找范围内血量最低的房屋
+      let best=null, bestPct=1;
+      for (const r of ROOMS){
+        if (r.hp >= r.hpMax) continue;
+        if (dist2(p.x,p.y,r.x,r.y) > d.range*d.range) continue;
+        const pct = r.hp/r.hpMax;
+        if (pct < bestPct){ bestPct = pct; best = r; }
+      }
+      if (best){
+        const heal = d.healRate * dt;
+        best.hp = Math.min(best.hpMax, best.hp + heal);
+        p.healPulse = 0.4;
+        // 治疗粒子
+        if (Math.random() < dt * 3){
+          PARTICLES.push({
+            x:p.x + rnd(-6,6), y:p.y + rnd(-6,6),
+            vx:0, vy:-30, life:0.8, max:0.8,
+            color:'#ff9bb8', size:2, kind:'heart',
+          });
+        }
+      }
+      if (p.healPulse > 0) p.healPulse -= dt;
+    }
+
+    if (d.powerGen){
+      p.smokeT = (p.smokeT||0) + dt;
+      if (p.smokeT > 0.2){
+        p.smokeT = 0;
+        PARTICLES.push({
+          x:p.x + rnd(-4,4), y:p.y - 12,
+          vx:rnd(-8,8), vy:-25, life:1.2, max:1.2,
+          color:'#3a342e', size:rnd(3,5), kind:'smoke',
+        });
+      }
+    }
+    if (d.moneyGen){
+      p.sparkT = (p.sparkT||0) + dt;
+      if (p.sparkT > 0.5){
+        p.sparkT = 0;
+        PARTICLES.push({
+          x:p.x + rnd(-8,8), y:p.y + rnd(-4,4),
+          vx:rnd(-15,15), vy:-40, life:0.6, max:0.6,
+          color:'#ffd76b', size:1.5, kind:'spark',
+        });
+      }
+    }
+  }
+
+  // 子弹
+  for (let i=BULLETS.length-1;i>=0;i--){
+    const b = BULLETS[i];
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    b.life -= dt;
+    if (b.life <= 0){ BULLETS.splice(i,1); continue; }
+    let hit = false;
+    for (const z of ZOMBIES){
+      if (dist2(b.x,b.y,z.x,z.y) < (z.r+4)*(z.r+4)){
+        z.hp -= b.dmg;
+        z.hitT = 0.12;
+        spawnFloat(z.x, z.y - 14, Math.round(b.dmg), 'dmg');
+        // 火花
+        for (let k=0;k<4;k++){
+          PARTICLES.push({
+            x:b.x, y:b.y,
+            vx:rnd(-60,60), vy:rnd(-60,60),
+            life:0.25, max:0.25, color:b.color, size:1.5, kind:'spark',
+          });
+        }
+        hit = true; break;
+      }
+    }
+    if (hit){ BULLETS.splice(i,1); continue; }
+  }
+
+  // 丧尸
+  for (let i=ZOMBIES.length-1;i>=0;i--){
+    const z = ZOMBIES[i];
+    if (z.hp <= 0){
+      // 死亡:血溅
+      for (let k=0;k<14;k++){
+        PARTICLES.push({
+          x:z.x, y:z.y,
+          vx:rnd(-80,80), vy:rnd(-80,80),
+          life:rnd(0.5,1), max:1, color:'#7a1818', size:rnd(2,4), kind:'blood',
+        });
+      }
+      // 地上血迹
+      FX.push({kind:'bloodstain', x:z.x, y:z.y, life:30, max:30, r:rnd(8,14)});
+      STATE.money += 4 + STATE.wave;
+      STATE.kills++;
+      ZOMBIES.splice(i,1);
+      continue;
+    }
+
+    // 选目标:墙 > 房屋(当前波次目标优先,其次最近)
+    let target = null;
+    let targetDist = Infinity;
+    // 优先碰到的墙/路障
+    for (const p of PLACED){
+      if (p.type !== 'wall') continue;
+      const dd = dist2(z.x,z.y,p.x,p.y);
+      if (dd < (z.r + 18)*(z.r + 18) + 5000 && dd < targetDist){
+        targetDist = dd; target = {kind:'device', obj:p};
+      }
+    }
+    // 没有墙就冲房屋
+    if (!target){
+      const tgtRoom = ROOMS[STATE.targetHouseIdx];
+      if (tgtRoom.hp > 0){
+        target = {kind:'room', obj:tgtRoom};
+      } else {
+        // 找最近活着的房屋
+        let best=null, bd=Infinity;
+        for (const r of ROOMS){
+          if (r.hp<=0) continue;
+          const dd = dist2(z.x,z.y,r.x,r.y);
+          if (dd<bd){bd=dd; best=r;}
+        }
+        if (best) target = {kind:'room', obj:best};
+      }
+    }
+
+    if (target){
+      const t = target.obj;
+      const dx = t.x - z.x, dy = t.y - z.y;
+      const dlen = Math.sqrt(dx*dx + dy*dy);
+      const reachR = target.kind === 'device' ? 22 : (t.w*0.5 + 6);
+      if (dlen > reachR){
+        z.x += (dx/dlen) * z.speed * dt;
+        z.y += (dy/dlen) * z.speed * dt;
+        z.angle = Math.atan2(dy, dx);
+        z.walkT = (z.walkT||0) + dt;
+      } else {
+        z.attackCD -= dt;
+        if (z.attackCD <= 0){
+          z.attackCD = 0.9;
+          t.hp -= z.dmg;
+          z.swingT = 0.25;
+          spawnFloat(t.x + rnd(-15,15), t.y, '-'+z.dmg, 'dmg');
+          if (target.kind === 'device' && t.hp <= 0){
+            const idx = PLACED.indexOf(t);
+            if (idx>=0){
+              PLACED.splice(idx,1);
+              const s = SLOTS.find(s=>s.device===t);
+              if (s) s.device = null;
+              recalcPower();
+              // 爆碎粒子
+              for (let k=0;k<10;k++){
+                PARTICLES.push({
+                  x:t.x, y:t.y,
+                  vx:rnd(-100,100), vy:rnd(-100,100),
+                  life:0.6, max:0.6, color:'#8a7050', size:2, kind:'spark',
+                });
+              }
+            }
+          } else if (target.kind === 'room' && t.hp <= 0){
+            t.hp = 0;
+            if (ROOMS.every(r=>r.hp<=0)) gameOver();
+          }
+        }
+        if (z.swingT > 0) z.swingT -= dt;
+      }
+    }
+    if (z.hitT > 0) z.hitT -= dt;
+  }
+
+  // 粒子
+  for (let i=PARTICLES.length-1;i>=0;i--){
+    const p = PARTICLES[i];
+    p.life -= dt;
+    if (p.life <= 0){ PARTICLES.splice(i,1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.kind !== 'heart' && p.kind !== 'smoke') p.vy += 60*dt;
+    p.vx *= 0.97; p.vy *= 0.97;
+  }
+  // 血迹之类的 fx
+  for (let i=FX.length-1;i>=0;i--){
+    FX[i].life -= dt;
+    if (FX[i].life <= 0) FX.splice(i,1);
+  }
+}
+
+function startWave(){
+  STATE.wave++;
+  STATE.inWave = true;
+  STATE.zombieToSpawn = 5 + STATE.wave * 2;
+  STATE.spawnTimer = 0.3;
+  const target = ROOMS[STATE.targetHouseIdx];
+  document.getElementById('ww-n').textContent = STATE.wave;
+  document.getElementById('ww-t').textContent = target.name;
+  const warn = document.getElementById('wave-warn');
+  warn.classList.add('show');
+  setTimeout(()=>warn.classList.remove('show'), 2400);
+}
+
+function spawnZombie(){
+  // 从屏外随机一边刷
+  const target = ROOMS[STATE.targetHouseIdx];
+  const ang = Math.atan2(target.y, target.x) + rnd(-Math.PI*0.7, Math.PI*0.7);
+  const dist = 700 + Math.random()*200;
+  const x = Math.cos(ang) * dist;
+  const y = Math.sin(ang) * dist;
+  const tier = Math.random();
+  const isElite = tier > 0.88;
+  ZOMBIES.push({
+    x, y,
+    r: isElite ? 14 : 10,
+    hp: 20 + STATE.wave*6 + (isElite ? 50:0),
+    hpMax: 20 + STATE.wave*6 + (isElite ? 50:0),
+    speed: isElite ? 32 : rnd(36, 48),
+    dmg: isElite ? 16 : 8,
+    color: isElite ? '#a04a4a' : '#5a7a3a',
+    angle:0, walkT:rnd(0,TAU), swingT:0, hitT:0, attackCD:1,
+    isElite,
+  });
+}
+
+function gameOver(){
+  STATE.alive = false;
+  document.getElementById('go-stats').textContent = `坚守了 ${STATE.wave} 波 · 击杀 ${STATE.kills} 只`;
+  document.getElementById('game-over').classList.add('show');
+}
+
+function spawnFloat(wx, wy, text, kind){
+  const s = w2s(wx, wy);
+  const el = document.createElement('div');
+  el.className = 'float-num ' + kind;
+  el.style.left = s.x + 'px'; el.style.top = s.y + 'px';
+  el.style.transform = 'translate(-50%, 0)';
+  el.textContent = text;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 1400);
+}
+
+/* ----------------------------- 渲染 ----------------------------- */
+function draw(){
+  const W = innerWidth, H = innerHeight;
+  CTX.fillStyle = '#06070a';
+  CTX.fillRect(0,0,W,H);
+
+  CTX.save();
+  CTX.translate(W/2, H/2);
+  CTX.scale(VIEW.scale, VIEW.scale);
+  CTX.translate(-VIEW.x, -VIEW.y);
+
+  drawOutdoor();
+  drawBloodStains();
+  // 房屋按 y 排序,有点伪 3D 遮挡感
+  const sortedRooms = [...ROOMS].sort((a,b)=>a.y - b.y);
+  for (const r of sortedRooms) drawRoom(r);
+
+  drawSlots();
+  drawPlacedDevices();
+  drawZombies();
+  drawBullets();
+  drawParticles();
+  drawTargetIndicator();
+
+  CTX.restore();
+
+  drawVignette();
+  drawNightTint();
+}
+
+function drawTargetIndicator(){
+  if (!STATE.alive) return;
+  const r = ROOMS[STATE.targetHouseIdx];
+  if (!r || r.hp<=0) return;
+  // 头顶箭头 + 文字
+  const t = performance.now()/300;
+  const yOff = -r.h/2 - 36 + Math.sin(t)*3;
+  CTX.fillStyle = STATE.inWave ? '#ff5050' : '#c46a30';
+  CTX.beginPath();
+  CTX.moveTo(r.x, r.y + yOff + 8);
+  CTX.lineTo(r.x - 6, r.y + yOff);
+  CTX.lineTo(r.x + 6, r.y + yOff);
+  CTX.closePath();
+  CTX.fill();
+  CTX.font = `${10}px -apple-system`;
+  CTX.fillStyle = STATE.inWave ? '#ff8080' : '#a08070';
+  CTX.textAlign = 'center';
+  CTX.fillText(STATE.inWave?'攻击中':'下个目标', r.x, r.y + yOff - 4);
+}
+
+/* —— 户外 —— */
+const OUTDOOR_DETAILS = [], LEAVES = [];
+(function(){
+  for (let i=0;i<100;i++) OUTDOOR_DETAILS.push({x:rnd(-1100,1100),y:rnd(-900,900),r:rnd(20,80),a:rnd(0,TAU)});
+  const lc=['#3a2818','#4a3220','#2a1f14','#5a3a22'];
+  for (let i=0;i<200;i++) LEAVES.push({x:rnd(-1100,1100),y:rnd(-900,900),r:rnd(2,5),a:rnd(0,TAU),c:lc[i%lc.length]});
+})();
+
+function drawOutdoor(){
+  const tl=s2w(0,0), br=s2w(innerWidth,innerHeight);
+  CTX.fillStyle = '#0a0908';
+  CTX.fillRect(tl.x-200,tl.y-200,br.x-tl.x+400,br.y-tl.y+400);
+
+  // 砖缝
+  CTX.strokeStyle = 'rgba(255,255,255,0.018)';
+  CTX.lineWidth = 1/VIEW.scale;
+  const G = 80;
+  const x0=Math.floor(tl.x/G)*G,x1=Math.ceil(br.x/G)*G;
+  const y0=Math.floor(tl.y/G)*G,y1=Math.ceil(br.y/G)*G;
+  CTX.beginPath();
+  for (let x=x0;x<=x1;x+=G){CTX.moveTo(x,y0);CTX.lineTo(x,y1);}
+  for (let y=y0;y<=y1;y+=G){CTX.moveTo(x0,y);CTX.lineTo(x1,y);}
+  CTX.stroke();
+
+  // 水洼
+  CTX.fillStyle = 'rgba(20,30,40,0.5)';
+  for (const p of OUTDOOR_DETAILS){
+    CTX.beginPath(); CTX.ellipse(p.x,p.y,p.r,p.r*0.5,p.a,0,TAU); CTX.fill();
+  }
+  for (const l of LEAVES){
+    CTX.save(); CTX.translate(l.x,l.y); CTX.rotate(l.a);
+    CTX.fillStyle = l.c;
+    CTX.beginPath(); CTX.ellipse(0,0,l.r,l.r*0.4,0,0,TAU); CTX.fill();
+    CTX.restore();
+  }
+}
+
+function drawBloodStains(){
+  for (const s of FX){
+    if (s.kind !== 'bloodstain') continue;
+    const a = clamp(s.life/s.max, 0, 1) * 0.45;
+    CTX.globalAlpha = a;
+    CTX.fillStyle = '#4a0808';
+    CTX.beginPath(); CTX.arc(s.x, s.y, s.r, 0, TAU); CTX.fill();
+    CTX.fillStyle = '#7a1818';
+    CTX.beginPath(); CTX.arc(s.x-1, s.y-1, s.r*0.6, 0, TAU); CTX.fill();
+    CTX.globalAlpha = 1;
+  }
+}
+
+/* —— 房间 —— */
+function drawRoom(r){
+  CTX.save();
+  CTX.translate(r.x, r.y);
+  const hw = r.w/2, hh = r.h/2;
+
+  // 受伤抖动
+  let sx=0, sy=0;
+  if (r.hp < r.hpMax){
+    const dmgPct = 1 - r.hp/r.hpMax;
+    // 检测是否正在被攻击(有近距离丧尸)
+    for (const z of ZOMBIES){
+      if (dist2(z.x,z.y,r.x,r.y) < (hw+30)*(hw+30) && z.swingT > 0){
+        sx = rnd(-1.5,1.5); sy = rnd(-1.5,1.5);
+        break;
+      }
+    }
+    if (dmgPct > 0.5){
+      // 持续微抖
+      sx += Math.sin(performance.now()/80) * 0.4 * dmgPct;
+    }
+  }
+  CTX.translate(sx, sy);
+
+  // 阴影
+  CTX.fillStyle = 'rgba(0,0,0,0.6)';
+  CTX.fillRect(-hw+6,-hh+6,r.w,r.h);
+  // 墙
+  CTX.fillStyle = r.wall;
+  CTX.fillRect(-hw-6,-hh-6,r.w+12,r.h+12);
+  // 墙阴影
+  CTX.fillStyle = 'rgba(0,0,0,0.4)';
+  CTX.fillRect(-hw-6,hh,r.w+12,6);
+  CTX.fillRect(hw,-hh-6,6,r.h+12);
+  CTX.fillStyle = 'rgba(255,220,170,0.04)';
+  CTX.fillRect(-hw-6,-hh-6,r.w+12,2);
+  CTX.fillRect(-hw-6,-hh-6,2,r.h+12);
+
+  drawFloor(r,-hw,-hh,r.w,r.h);
+
+  // 受伤裂纹
+  if (r.hp < r.hpMax){
+    const cracks = Math.floor((1 - r.hp/r.hpMax) * 5);
+    CTX.strokeStyle = 'rgba(0,0,0,0.5)';
+    CTX.lineWidth = 1.2/VIEW.scale;
+    for (let i=0;i<cracks;i++){
+      const seed = (r.id.charCodeAt(0) + i * 73) % 100;
+      const sx0 = -hw + (seed/100)*r.w;
+      const sy0 = -hh + ((seed*7)%100)/100 * r.h;
+      CTX.beginPath();
+      CTX.moveTo(sx0, sy0);
+      CTX.lineTo(sx0 + ((seed%3)-1)*20, sy0 + 30);
+      CTX.lineTo(sx0 + ((seed%5)-2)*20, sy0 + 60);
+      CTX.stroke();
+    }
+  }
+
+  // 室内柔光
+  const grad = CTX.createRadialGradient(0,-hh*0.5,10,0,0,Math.max(r.w,r.h)*0.7);
+  grad.addColorStop(0,'rgba(255,220,170,0.08)');
+  grad.addColorStop(1,'rgba(0,0,0,0.35)');
+  CTX.fillStyle = grad;
+  CTX.fillRect(-hw,-hh,r.w,r.h);
+
+  for (const f of r.furniture) drawFurniture(f);
+  drawCharacterOnBed(r);
+
+  // 灯光
+  if (r.lampGlow){
+    const [lx,ly] = r.lampGlow;
+    const flick = 1 + Math.sin(performance.now()/200 + r.x) * 0.05;
+    const lg = CTX.createRadialGradient(lx,ly,0,lx,ly,90*flick);
+    lg.addColorStop(0,'rgba(255,210,130,0.45)');
+    lg.addColorStop(0.5,'rgba(255,180,100,0.15)');
+    lg.addColorStop(1,'rgba(255,180,100,0)');
+    CTX.fillStyle = lg;
+    CTX.fillRect(-hw,-hh,r.w,r.h);
+  }
+  if (r.monitorGlow){
+    const pulse = 1 + Math.sin(performance.now()/350)*0.08;
+    const lg = CTX.createRadialGradient(15,-45,0,15,-45,110*pulse);
+    lg.addColorStop(0,'rgba(80,140,255,0.35)');
+    lg.addColorStop(1,'rgba(80,140,255,0)');
+    CTX.fillStyle = lg;
+    CTX.fillRect(-hw,-hh,r.w,r.h);
+  }
+
+  // 名牌
+  CTX.fillStyle = 'rgba(180,140,80,0.7)';
+  CTX.font = `12px -apple-system`;
+  CTX.textAlign = 'left';
+  CTX.fillText(r.name+' · '+r.title, -hw, -hh-14);
+  CTX.strokeStyle = 'rgba(180,140,80,0.3)';
+  CTX.lineWidth = 1/VIEW.scale;
+  CTX.beginPath(); CTX.moveTo(-hw,-hh-8); CTX.lineTo(hw,-hh-8); CTX.stroke();
+
+  // HP 条
+  const bw = r.w, bh = 4;
+  CTX.fillStyle = 'rgba(0,0,0,0.7)';
+  CTX.fillRect(-bw/2, hh+10, bw, bh);
+  const hpPct = Math.max(0, r.hp/r.hpMax);
+  CTX.fillStyle = hpPct > 0.5 ? '#86c850' : (hpPct > 0.25 ? '#e8c060' : '#c44040');
+  CTX.fillRect(-bw/2, hh+10, bw * hpPct, bh);
+  CTX.strokeStyle = 'rgba(180,140,80,0.4)';
+  CTX.lineWidth = 1/VIEW.scale;
+  CTX.strokeRect(-bw/2, hh+10, bw, bh);
+
+  CTX.restore();
+}
+
+function drawFloor(r,x,y,w,h){
+  CTX.fillStyle = r.floor;
+  CTX.fillRect(x,y,w,h);
+  if (r.floorPattern === 'plank'){
+    CTX.strokeStyle = 'rgba(0,0,0,0.5)';
+    CTX.lineWidth = 1/VIEW.scale;
+    for (let yy=y+10; yy<y+h; yy+=14){CTX.beginPath();CTX.moveTo(x,yy);CTX.lineTo(x+w,yy);CTX.stroke();}
+    CTX.fillStyle = 'rgba(255,200,150,0.025)';
+    for (let i=0;i<40;i++) CTX.fillRect(x+Math.random()*w,y+Math.random()*h,rnd(8,18),1);
+  } else if (r.floorPattern === 'concrete'){
+    CTX.fillStyle = 'rgba(255,255,255,0.012)';
+    for (let i=0;i<60;i++) CTX.fillRect(x+Math.random()*w,y+Math.random()*h,2,2);
+    CTX.strokeStyle = 'rgba(0,0,0,0.4)';
+    CTX.lineWidth = 1/VIEW.scale;
+    CTX.beginPath();
+    CTX.moveTo(x+20,y+h*0.3); CTX.lineTo(x+w*0.5,y+h*0.45); CTX.lineTo(x+w*0.7,y+h*0.7);
+    CTX.stroke();
+  } else if (r.floorPattern === 'tile'){
+    CTX.strokeStyle = 'rgba(0,0,0,0.45)';
+    CTX.lineWidth = 1/VIEW.scale;
+    const t=22;
+    for (let xx=x;xx<=x+w;xx+=t){CTX.beginPath();CTX.moveTo(xx,y);CTX.lineTo(xx,y+h);CTX.stroke();}
+    for (let yy=y;yy<=y+h;yy+=t){CTX.beginPath();CTX.moveTo(x,yy);CTX.lineTo(x+w,yy);CTX.stroke();}
+  }
+}
+
+function drawFurniture(f){
+  const [type,dx,dy,w,h,color,extra] = f;
+  switch (type){
+    case 'bed':{
+      CTX.fillStyle='#0a0606'; CTX.fillRect(dx-w/2+2,dy-h/2+2,w,h);
+      CTX.fillStyle=color; CTX.fillRect(dx-w/2,dy-h/2,w,h);
+      CTX.fillStyle='rgba(255,255,255,0.04)'; CTX.fillRect(dx-w/2,dy-h/2,w,2);
+      const mw=w-12,mh=h-10;
+      CTX.fillStyle='#d4c4a8'; CTX.fillRect(dx-mw/2,dy-mh/2,mw,mh);
+      CTX.fillStyle='rgba(0,0,0,0.15)'; CTX.fillRect(dx-mw/2,dy+mh/2-3,mw,3);
+      CTX.fillStyle='#e8dcc4';
+      CTX.fillRect(dx-mw/2+4,dy-mh/2+3,mw*0.45,mh*0.35);
+      break;
+    }
+    case 'rug':{
+      CTX.fillStyle=color;
+      roundRect(dx-w/2,dy-h/2,w,h,3); CTX.fill();
+      CTX.strokeStyle='rgba(0,0,0,0.4)'; CTX.lineWidth=1/VIEW.scale;
+      roundRect(dx-w/2+3,dy-h/2+3,w-6,h-6,2); CTX.stroke();
+      break;
+    }
+    case 'lamp':{
+      // 灯光抖动
+      const flick = 1 + Math.sin(performance.now()/150+dx)*0.15;
+      CTX.fillStyle='rgba(0,0,0,0.5)';
+      CTX.beginPath(); CTX.arc(dx,dy,7,0,TAU); CTX.fill();
+      CTX.fillStyle='#2a1f16';
+      CTX.beginPath(); CTX.arc(dx,dy,6,0,TAU); CTX.fill();
+      CTX.fillStyle=color;
+      CTX.beginPath(); CTX.arc(dx,dy,4*flick,0,TAU); CTX.fill();
+      CTX.fillStyle='#fff4d8';
+      CTX.beginPath(); CTX.arc(dx,dy,1.8*flick,0,TAU); CTX.fill();
+      break;
+    }
+    case 'bench': case 'desk': case 'counter': case 'table': case 'drawer':{
+      CTX.fillStyle='#000'; CTX.fillRect(dx-w/2+2,dy-h/2+2,w,h);
+      CTX.fillStyle=color; CTX.fillRect(dx-w/2,dy-h/2,w,h);
+      CTX.strokeStyle='rgba(0,0,0,0.4)'; CTX.lineWidth=1/VIEW.scale;
+      for (let xx=dx-w/2+6;xx<dx+w/2;xx+=8){CTX.beginPath();CTX.moveTo(xx,dy-h/2);CTX.lineTo(xx,dy+h/2);CTX.stroke();}
+      if (extra && extra.detail==='tools'){
+        CTX.fillStyle='#8a8270'; CTX.fillRect(dx-w/2+6,dy-4,18,3);
+        CTX.fillStyle='#3a3026'; CTX.fillRect(dx-w/2+30,dy-3,14,2);
+        CTX.fillStyle='#a06030';
+        const gT = performance.now()/2000;
+        CTX.save(); CTX.translate(dx-w/2+55,dy); CTX.rotate(gT);
+        for (let i=0;i<6;i++){
+          CTX.fillRect(-1,-4,2,2);
+          CTX.rotate(Math.PI/3);
+        }
+        CTX.fillStyle='#a06030';
+        CTX.beginPath(); CTX.arc(0,0,2.5,0,TAU); CTX.fill();
+        CTX.restore();
+        CTX.fillStyle='#5a5040'; CTX.fillRect(dx+w/2-25,dy-5,18,10);
+      }
+      break;
+    }
+    case 'shelf':{
+      CTX.fillStyle='#000'; CTX.fillRect(dx-w/2+2,dy-h/2+2,w,h);
+      CTX.fillStyle=color; CTX.fillRect(dx-w/2,dy-h/2,w,h);
+      CTX.strokeStyle='rgba(0,0,0,0.5)'; CTX.lineWidth=1/VIEW.scale;
+      for (let yy=dy-h/2+14;yy<dy+h/2;yy+=14){CTX.beginPath();CTX.moveTo(dx-w/2,yy);CTX.lineTo(dx+w/2,yy);CTX.stroke();}
+      if (extra && extra.detail==='parts'){
+        for (let yy=dy-h/2+6;yy<dy+h/2-4;yy+=14){
+          CTX.fillStyle=['#8a8270','#5a4a30','#a06030'][((yy/14)|0)%3];
+          CTX.fillRect(dx-w/2+3,yy+2,w-6,6);
+        }
+      }
+      if (extra && extra.detail==='herbs'){
+        for (let yy=dy-h/2+6;yy<dy+h/2-4;yy+=14){
+          CTX.fillStyle='#3a5028'; CTX.fillRect(dx-w/2+3,yy+4,5,4);
+          CTX.fillStyle='#c4a060'; CTX.fillRect(dx-w/2+10,yy+4,5,4);
+        }
+      }
+      break;
+    }
+    case 'crate':{
+      CTX.fillStyle='#000'; CTX.fillRect(dx-w/2+2,dy-h/2+2,w,h);
+      CTX.fillStyle=color; CTX.fillRect(dx-w/2,dy-h/2,w,h);
+      CTX.strokeStyle='rgba(0,0,0,0.5)'; CTX.lineWidth=1/VIEW.scale;
+      CTX.beginPath(); CTX.moveTo(dx-w/2,dy); CTX.lineTo(dx+w/2,dy);
+      CTX.moveTo(dx,dy-h/2); CTX.lineTo(dx,dy+h/2); CTX.stroke();
+      CTX.fillStyle='rgba(180,140,80,0.4)';
+      for (const [x,y] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+        CTX.beginPath(); CTX.arc(dx+x*(w/2-3),dy+y*(h/2-3),1,0,TAU); CTX.fill();
+      }
+      break;
+    }
+    case 'cpu':{
+      // 屏幕滚动
+      CTX.fillStyle='#000'; CTX.fillRect(dx-w/2+1,dy-h/2+1,w,h);
+      CTX.fillStyle=color; CTX.fillRect(dx-w/2,dy-h/2,w,h);
+      // 闪烁
+      const flick = 0.7 + 0.3*Math.sin(performance.now()/130 + dx);
+      CTX.globalAlpha = flick;
+      CTX.fillStyle=extra.glow;
+      CTX.fillRect(dx-w/2+2,dy-h/2+2,w-4,h-4);
+      CTX.globalAlpha = 1;
+      // 扫描线
+      const sl = (performance.now()/30 + dx*5) % (h - 4);
+      CTX.fillStyle='rgba(255,255,255,0.15)';
+      CTX.fillRect(dx-w/2+2,dy-h/2+2+sl,w-4,1);
+      // 静态行
+      CTX.fillStyle='rgba(0,0,0,0.4)';
+      for (let yy=dy-h/2+4;yy<dy+h/2;yy+=3) CTX.fillRect(dx-w/2+2,yy,w-4,1);
+      break;
+    }
+    case 'cable':{
+      CTX.strokeStyle='rgba(20,18,16,0.8)'; CTX.lineWidth=2/VIEW.scale;
+      CTX.beginPath(); CTX.moveTo(dx-30,dy-30);
+      CTX.bezierCurveTo(dx-10,dy+10,dx+20,dy-5,dx+30,dy+25); CTX.stroke();
+      CTX.beginPath(); CTX.moveTo(dx-30,dy+10);
+      CTX.bezierCurveTo(dx-5,dy-5,dx+15,dy+15,dx+35,dy+5); CTX.stroke();
+      break;
+    }
+    case 'poster':{
+      CTX.fillStyle='#000'; CTX.fillRect(dx-w/2+1,dy-h/2+1,w,h);
+      CTX.fillStyle=color; CTX.fillRect(dx-w/2,dy-h/2,w,h);
+      CTX.fillStyle='rgba(255,200,180,0.18)';
+      CTX.beginPath(); CTX.arc(dx,dy-h/4,w*0.2,0,TAU); CTX.fill();
+      break;
+    }
+    case 'can':{
+      CTX.fillStyle='#000';
+      CTX.beginPath(); CTX.ellipse(dx,dy+h/2,w/2,2,0,0,TAU); CTX.fill();
+      CTX.fillStyle=color; CTX.fillRect(dx-w/2,dy-h/2,w,h);
+      CTX.fillStyle='rgba(255,255,255,0.2)'; CTX.fillRect(dx-w/2+1,dy-h/2+1,1,h-2);
+      CTX.fillStyle='#2a2418'; CTX.fillRect(dx-w/2,dy-h/2,w,2);
+      break;
+    }
+    case 'cabinet':{
+      CTX.fillStyle='#000'; CTX.fillRect(dx-w/2+2,dy-h/2+2,w,h);
+      CTX.fillStyle=color; CTX.fillRect(dx-w/2,dy-h/2,w,h);
+      CTX.fillStyle='#a8d8d0';
+      CTX.fillRect(dx-2,dy-h/2+4,4,4); CTX.fillRect(dx-2,dy+4,4,4);
+      CTX.fillStyle='rgba(180,220,210,0.15)';
+      CTX.fillRect(dx-w/2+3,dy-h/2+3,w-6,h/2-6);
+      if (extra && extra.detail==='meds'){
+        for (let i=0;i<4;i++){
+          CTX.fillStyle='#a8d8d0';
+          CTX.fillRect(dx-w/2+6+i*10,dy-h/2+8,4,8);
+        }
+      }
+      break;
+    }
+    case 'stand': case 'stool': case 'chair':{
+      CTX.fillStyle='#000';
+      CTX.beginPath(); CTX.arc(dx,dy+2,w/2+1,0,TAU); CTX.fill();
+      CTX.fillStyle=color;
+      CTX.beginPath(); CTX.arc(dx,dy,w/2,0,TAU); CTX.fill();
+      CTX.fillStyle='rgba(255,255,255,0.1)';
+      CTX.beginPath(); CTX.arc(dx-2,dy-2,w/2-3,0,TAU); CTX.fill();
+      break;
+    }
+    case 'xray':{
+      CTX.fillStyle='#000'; CTX.fillRect(dx-w/2+2,dy-h/2+2,w,h);
+      CTX.fillStyle=color; CTX.fillRect(dx-w/2,dy-h/2,w,h);
+      const flick = 0.8+0.2*Math.sin(performance.now()/400);
+      CTX.globalAlpha=flick;
+      CTX.fillStyle=extra.glow; CTX.fillRect(dx-w/2+3,dy-h/2+3,w-6,h-6);
+      CTX.globalAlpha=1;
+      CTX.fillStyle='rgba(0,0,0,0.5)';
+      CTX.fillRect(dx-1,dy-h/4,2,h/2);
+      CTX.fillRect(dx-w/8,dy-h/4-2,w/4,4);
+      break;
+    }
+    case 'rack':{
+      CTX.fillStyle='#000'; CTX.fillRect(dx-w/2+2,dy-h/2+2,w,h);
+      CTX.fillStyle=color; CTX.fillRect(dx-w/2,dy-h/2,w,h);
+      CTX.fillStyle='#2a2218'; CTX.fillRect(dx-w/2+5,dy-4,w-10,3);
+      CTX.fillStyle='#3a3026'; CTX.fillRect(dx-w/2+5,dy+3,w-10,3);
+      CTX.fillStyle='#5a4a30';
+      CTX.fillRect(dx+w/2-12,dy-4,8,3);
+      CTX.fillRect(dx+w/2-12,dy+3,8,3);
+      break;
+    }
+    case 'radio':{
+      CTX.fillStyle='#000'; CTX.fillRect(dx-w/2+2,dy-h/2+2,w,h);
+      CTX.fillStyle=color; CTX.fillRect(dx-w/2,dy-h/2,w,h);
+      CTX.fillStyle='#5a4a30';
+      CTX.beginPath(); CTX.arc(dx-w/4,dy,3,0,TAU); CTX.fill();
+      CTX.beginPath(); CTX.arc(dx+w/4,dy,3,0,TAU); CTX.fill();
+      const flick = Math.sin(performance.now()/250)>0?1:0.4;
+      CTX.globalAlpha=flick;
+      CTX.fillStyle=extra.glow;
+      CTX.fillRect(dx-6,dy-h/2+3,12,4);
+      CTX.globalAlpha=1;
+      CTX.strokeStyle='#2a2218'; CTX.lineWidth=1.5/VIEW.scale;
+      CTX.beginPath(); CTX.moveTo(dx+w/2-3,dy-h/2); CTX.lineTo(dx+w/2+8,dy-h/2-12); CTX.stroke();
+      break;
+    }
+    case 'boots':{
+      CTX.fillStyle='#000'; CTX.fillRect(dx-w/2+1,dy-h/2+1,w,h);
+      CTX.fillStyle=color;
+      CTX.fillRect(dx-w/2,dy-h/2,w/2-1,h);
+      CTX.fillRect(dx+1,dy-h/2,w/2-1,h);
+      break;
+    }
+    case 'flag':{
+      CTX.strokeStyle='#1a1612'; CTX.lineWidth=1/VIEW.scale;
+      CTX.beginPath(); CTX.moveTo(dx,dy-h/2); CTX.lineTo(dx,dy+h/2); CTX.stroke();
+      // 旗飘动
+      const t = performance.now()/300;
+      CTX.fillStyle=color;
+      CTX.beginPath();
+      CTX.moveTo(dx,dy-h/2);
+      CTX.lineTo(dx+10 + Math.sin(t)*2, dy-h/2+4);
+      CTX.lineTo(dx,dy-h/2+8);
+      CTX.fill();
+      break;
+    }
+    case 'stove':{
+      CTX.fillStyle='#000'; CTX.fillRect(dx-w/2+2,dy-h/2+2,w,h);
+      CTX.fillStyle=color; CTX.fillRect(dx-w/2,dy-h/2,w,h);
+      CTX.fillStyle='#0a0606';
+      CTX.beginPath(); CTX.arc(dx-w/4,dy,6,0,TAU); CTX.fill();
+      CTX.beginPath(); CTX.arc(dx+w/4,dy,6,0,TAU); CTX.fill();
+      // 火苗动态
+      const ft = performance.now()/80;
+      CTX.fillStyle=extra.glow;
+      CTX.beginPath(); CTX.arc(dx-w/4,dy,3.2+Math.sin(ft)*0.8,0,TAU); CTX.fill();
+      CTX.fillStyle='rgba(255,220,120,0.9)';
+      CTX.beginPath(); CTX.arc(dx-w/4,dy-1,1.6+Math.cos(ft*1.3)*0.4,0,TAU); CTX.fill();
+      CTX.fillStyle=extra.glow;
+      CTX.beginPath(); CTX.arc(dx+w/4,dy,2.8+Math.sin(ft*0.7)*0.6,0,TAU); CTX.fill();
+      break;
+    }
+    case 'pot':{
+      CTX.fillStyle='#000';
+      CTX.beginPath(); CTX.arc(dx,dy+1,w/2+1,0,TAU); CTX.fill();
+      CTX.fillStyle=color;
+      CTX.beginPath(); CTX.arc(dx,dy,w/2,0,TAU); CTX.fill();
+      CTX.fillStyle='#5a3a22';
+      CTX.beginPath(); CTX.arc(dx,dy-1,w/2*0.6,0,TAU); CTX.fill();
+      // 蒸汽
+      const t = performance.now()/600;
+      CTX.fillStyle='rgba(255,255,255,0.08)';
+      CTX.beginPath();
+      CTX.arc(dx+Math.sin(t)*3, dy-10-Math.cos(t)*4, 4+Math.sin(t*0.7), 0, TAU);
+      CTX.fill();
+      CTX.beginPath();
+      CTX.arc(dx+Math.sin(t+1)*3, dy-16-Math.cos(t+1)*3, 3.5, 0, TAU);
+      CTX.fill();
+      break;
+    }
+    case 'hanging':{
+      CTX.fillStyle=color; CTX.fillRect(dx-w/2,dy,w,h);
+      for (let i=0;i<5;i++){
+        const xx=dx-w/2+8+i*(w-16)/4;
+        const sway = Math.sin(performance.now()/700 + i)*1.5;
+        CTX.fillStyle='#5a4830'; CTX.fillRect(xx-2+sway*0.3,dy+h,4,12);
+        CTX.fillStyle='#3a5028';
+        CTX.beginPath();
+        CTX.moveTo(xx-6+sway,dy+h+10);
+        CTX.lineTo(xx+6+sway,dy+h+10);
+        CTX.lineTo(xx+sway,dy+h+18);
+        CTX.fill();
+      }
+      break;
+    }
+  }
+}
+
+function drawCharacterOnBed(r){
+  const [bx,by]=r.bedPos;
+  const p=r.portrait;
+  // 被子
+  CTX.fillStyle=p.acc;
+  CTX.globalAlpha=0.85;
+  roundRect(bx-30,by-15,60,35,4); CTX.fill();
+  CTX.globalAlpha=1;
+  // 头
+  CTX.fillStyle=p.skin;
+  CTX.beginPath(); CTX.arc(bx-28,by-5,7,0,TAU); CTX.fill();
+  CTX.fillStyle=p.hair;
+  CTX.beginPath(); CTX.arc(bx-28,by-8,6,Math.PI*0.9,Math.PI*2.1); CTX.fill();
+  // 呼吸
+  const breath = Math.sin(performance.now()/1400+r.x)*1.2;
+  CTX.fillStyle=p.shirt;
+  CTX.globalAlpha=0.5;
+  CTX.beginPath();
+  CTX.ellipse(bx+8,by+4+breath*0.3,22,9,0,0,TAU); CTX.fill();
+  CTX.globalAlpha=1;
+}
+
+/* —— 建造槽 —— */
+function drawSlots(){
+  for (const s of SLOTS){
+    if (s.device) continue;
+    const hover = HOVER_SLOT === s;
+    const r = 14;
+    CTX.fillStyle = hover ? 'rgba(180,140,80,0.4)' : 'rgba(20,18,16,0.6)';
+    CTX.strokeStyle = hover ? '#e8c060' : 'rgba(180,140,80,0.5)';
+    CTX.lineWidth = (hover?2:1.2)/VIEW.scale;
+    CTX.setLineDash([5,3]);
+    CTX.beginPath(); CTX.arc(s.x, s.y, r, 0, TAU); CTX.fill(); CTX.stroke();
+    CTX.setLineDash([]);
+    // 加号
+    CTX.fillStyle = hover ? '#fff4d8' : 'rgba(180,140,80,0.7)';
+    CTX.fillRect(s.x-5, s.y-1, 10, 2);
+    CTX.fillRect(s.x-1, s.y-5, 2, 10);
+  }
+}
+
+function drawPlacedDevices(){
+  for (const p of PLACED){
+    const d = DEVICES[p.type];
+    const t = performance.now();
+
+    // 底座阴影
+    CTX.fillStyle='rgba(0,0,0,0.6)';
+    CTX.beginPath(); CTX.ellipse(p.x, p.y+12, 14, 4, 0, 0, TAU); CTX.fill();
+
+    // 主体
+    CTX.fillStyle = '#1a1612';
+    roundRect(p.x-13, p.y-13, 26, 26, 3); CTX.fill();
+    CTX.strokeStyle = d.color;
+    CTX.lineWidth = 1.5/VIEW.scale;
+    CTX.stroke();
+
+    if (p.type === 'turret'){
+      // 旋转炮塔
+      CTX.save();
+      CTX.translate(p.x, p.y);
+      CTX.rotate(p.angle || 0);
+      // 炮塔
+      CTX.fillStyle = d.color;
+      CTX.beginPath(); CTX.arc(0,0,7,0,TAU); CTX.fill();
+      // 炮管
+      CTX.fillStyle = '#3a4046';
+      CTX.fillRect(4,-2.5,12,5);
+      // 闪光
+      if (p.flash > 0){
+        CTX.fillStyle = '#ffeebb';
+        CTX.beginPath(); CTX.arc(18,0,5,0,TAU); CTX.fill();
+        CTX.fillStyle = 'rgba(255,200,100,0.5)';
+        CTX.beginPath(); CTX.arc(18,0,9,0,TAU); CTX.fill();
+      }
+      CTX.restore();
+    } else if (p.type === 'wall'){
+      // 路障 (双层叠加)
+      CTX.fillStyle = d.color;
+      CTX.fillRect(p.x-10, p.y-6, 20, 12);
+      CTX.fillStyle = 'rgba(0,0,0,0.4)';
+      CTX.fillRect(p.x-10, p.y, 20, 6);
+      CTX.fillStyle = 'rgba(255,220,170,0.1)';
+      CTX.fillRect(p.x-10, p.y-6, 20, 2);
+      // 损伤
+      if (p.hp < DEVICES.wall.hp){
+        CTX.strokeStyle='rgba(0,0,0,0.6)'; CTX.lineWidth=1/VIEW.scale;
+        CTX.beginPath();
+        CTX.moveTo(p.x-7,p.y-4); CTX.lineTo(p.x-3,p.y+2);
+        CTX.moveTo(p.x+3,p.y-3); CTX.lineTo(p.x+6,p.y+3);
+        CTX.stroke();
+      }
+    } else if (p.type === 'printer'){
+      // 印钞机:符号 + 闪光
+      CTX.fillStyle = d.color;
+      CTX.font = `bold 14px -apple-system`;
+      CTX.textAlign = 'center'; CTX.textBaseline = 'middle';
+      CTX.fillText('$', p.x, p.y);
+      // 顶部出钱口
+      const bobY = Math.sin(t/400 + p.x)*1;
+      CTX.fillStyle = 'rgba(255,220,120,0.5)';
+      CTX.fillRect(p.x-6, p.y-12+bobY, 12, 2);
+    } else if (p.type === 'med'){
+      // 急救箱
+      CTX.fillStyle = d.color;
+      const pulse = (p.healPulse||0) > 0 ? 1.1+Math.sin(t/100)*0.1 : 1;
+      CTX.fillRect(p.x-8*pulse, p.y-2, 16*pulse, 4);
+      CTX.fillRect(p.x-2, p.y-8*pulse, 4, 16*pulse);
+      CTX.strokeStyle = '#a04040'; CTX.lineWidth = 1/VIEW.scale;
+      CTX.strokeRect(p.x-9*pulse, p.y-3, 18*pulse, 6);
+    } else if (p.type === 'power'){
+      // 发电机:旋转齿轮
+      CTX.save();
+      CTX.translate(p.x, p.y);
+      CTX.rotate(t/500);
+      CTX.fillStyle = d.color;
+      for (let i=0;i<8;i++){
+        CTX.fillRect(-2,-10,4,4);
+        CTX.rotate(Math.PI/4);
+      }
+      CTX.beginPath(); CTX.arc(0,0,5,0,TAU); CTX.fill();
+      CTX.fillStyle = '#3a2812';
+      CTX.beginPath(); CTX.arc(0,0,2,0,TAU); CTX.fill();
+      CTX.restore();
+    }
+
+    // HP 条 (受损时)
+    if (p.hp < DEVICES[p.type].hp){
+      const w = 24;
+      const pct = p.hp / DEVICES[p.type].hp;
+      CTX.fillStyle = 'rgba(0,0,0,0.7)';
+      CTX.fillRect(p.x-w/2, p.y+16, w, 2.5);
+      CTX.fillStyle = pct>0.5?'#86c850':(pct>0.25?'#e8c060':'#c44040');
+      CTX.fillRect(p.x-w/2, p.y+16, w*pct, 2.5);
+    }
+  }
+}
+
+function drawZombies(){
+  for (const z of ZOMBIES){
+    // 影子
+    CTX.fillStyle='rgba(0,0,0,0.5)';
+    CTX.beginPath(); CTX.ellipse(z.x, z.y+z.r+2, z.r*0.8, z.r*0.3, 0, 0, TAU); CTX.fill();
+
+    // 行走腿摆
+    const legSwing = Math.sin(z.walkT*7) * 3;
+
+    CTX.save();
+    CTX.translate(z.x, z.y);
+    CTX.rotate(z.angle);
+
+    // 腿
+    CTX.fillStyle = z.isElite ? '#3a1818' : '#2a3a18';
+    CTX.fillRect(-z.r*0.7, -3+legSwing, z.r*0.5, 6);
+    CTX.fillRect(-z.r*0.7, -3-legSwing, z.r*0.5, 6);
+
+    // 身体
+    CTX.fillStyle = z.color;
+    CTX.beginPath(); CTX.arc(0, 0, z.r, 0, TAU); CTX.fill();
+
+    // 被击中泛白
+    if (z.hitT > 0){
+      CTX.fillStyle = 'rgba(255,255,255,'+(z.hitT/0.12*0.6)+')';
+      CTX.beginPath(); CTX.arc(0, 0, z.r, 0, TAU); CTX.fill();
+    }
+
+    // 攻击挥手前倾
+    if (z.swingT > 0){
+      const fwd = z.swingT/0.25 * 4;
+      CTX.fillStyle = z.color;
+      CTX.beginPath(); CTX.arc(z.r*0.4, -1, z.r*0.4, 0, TAU); CTX.fill();
+    }
+
+    // 头(略小)
+    CTX.fillStyle = z.isElite ? '#4a2424' : z.color;
+    CTX.beginPath(); CTX.arc(z.r*0.4, 0, z.r*0.6, 0, TAU); CTX.fill();
+    // 眼
+    CTX.fillStyle = z.isElite ? '#ff3030' : '#1a0a0a';
+    CTX.beginPath(); CTX.arc(z.r*0.5, -z.r*0.2, 1.4, 0, TAU); CTX.fill();
+    CTX.beginPath(); CTX.arc(z.r*0.7, z.r*0.1, 1.4, 0, TAU); CTX.fill();
+    CTX.restore();
+
+    // HP 条
+    if (z.hp < z.hpMax){
+      const w = z.r * 2;
+      CTX.fillStyle = 'rgba(0,0,0,0.6)';
+      CTX.fillRect(z.x-w/2, z.y-z.r-7, w, 2);
+      CTX.fillStyle = z.isElite ? '#ff5050' : '#c44040';
+      CTX.fillRect(z.x-w/2, z.y-z.r-7, w * (z.hp/z.hpMax), 2);
+    }
+    // 精英标记
+    if (z.isElite){
+      CTX.fillStyle = '#ff3030';
+      CTX.font = `bold 9px -apple-system`;
+      CTX.textAlign = 'center';
+      CTX.fillText('★', z.x, z.y - z.r - 10);
+    }
+  }
+}
+
+function drawBullets(){
+  for (const b of BULLETS){
+    CTX.fillStyle = b.color;
+    CTX.beginPath(); CTX.arc(b.x, b.y, 3, 0, TAU); CTX.fill();
+    // 拖尾
+    CTX.strokeStyle = b.color;
+    CTX.globalAlpha = 0.5;
+    CTX.lineWidth = 2/VIEW.scale;
+    CTX.beginPath();
+    CTX.moveTo(b.x, b.y);
+    CTX.lineTo(b.x - b.vx*0.025, b.y - b.vy*0.025);
+    CTX.stroke();
+    CTX.globalAlpha = 1;
+  }
+}
+
+function drawParticles(){
+  for (const p of PARTICLES){
+    const a = clamp(p.life/p.max, 0, 1);
+    CTX.globalAlpha = a;
+    if (p.kind === 'heart'){
+      CTX.fillStyle = p.color;
+      CTX.font = `${p.size*4}px serif`;
+      CTX.textAlign = 'center';
+      CTX.fillText('♥', p.x, p.y);
+    } else if (p.kind === 'smoke'){
+      CTX.fillStyle = p.color;
+      CTX.beginPath(); CTX.arc(p.x, p.y, p.size*(1+(1-a)*1.5), 0, TAU); CTX.fill();
+    } else {
+      CTX.fillStyle = p.color;
+      CTX.beginPath(); CTX.arc(p.x, p.y, p.size, 0, TAU); CTX.fill();
+    }
+    CTX.globalAlpha = 1;
+  }
+}
+
+function roundRect(x,y,w,h,r){
+  CTX.beginPath();
+  CTX.moveTo(x+r,y);
+  CTX.lineTo(x+w-r,y); CTX.quadraticCurveTo(x+w,y,x+w,y+r);
+  CTX.lineTo(x+w,y+h-r); CTX.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  CTX.lineTo(x+r,y+h); CTX.quadraticCurveTo(x,y+h,x,y+h-r);
+  CTX.lineTo(x,y+r); CTX.quadraticCurveTo(x,y,x+r,y);
+}
+
+function drawVignette(){
+  const W=innerWidth, H=innerHeight;
+  const g = CTX.createRadialGradient(W/2,H/2,Math.min(W,H)*0.25,W/2,H/2,Math.max(W,H)*0.65);
+  g.addColorStop(0,'rgba(0,0,0,0)');
+  g.addColorStop(1,'rgba(0,0,0,0.55)');
+  CTX.fillStyle=g;
+  CTX.fillRect(0,0,W,H);
+}
+
+function drawNightTint(){
+  const h = (TIME.mins/60)%24;
+  const isNight = h < 6 || h >= 19;
+  if (!isNight) return;
+  const W=innerWidth, H=innerHeight;
+  CTX.fillStyle='rgba(20,8,16,0.2)';
+  CTX.fillRect(0,0,W,H);
+}
+
+/* =====================================================================
+   输入处理 (鼠标/触屏统一)
+   ===================================================================== */
+let drag = null;
+let HOVER_SLOT = null;
+let bmenuEl = null;          // 当前打开的浮动菜单
+let bmenuSlot = null;
+const mouse = {x:innerWidth/2, y:innerHeight/2};
+
+function getEventXY(e){
+  if (e.touches && e.touches[0]) return {x:e.touches[0].clientX, y:e.touches[0].clientY};
+  if (e.changedTouches && e.changedTouches[0]) return {x:e.changedTouches[0].clientX, y:e.changedTouches[0].clientY};
+  return {x:e.clientX, y:e.clientY};
+}
+
+function onDown(e){
+  const xy = getEventXY(e);
+  drag = { sx:xy.x, sy:xy.y, startX:VIEW.x, startY:VIEW.y, moved:false };
+}
+function onMove(e){
+  const xy = getEventXY(e);
+  mouse.x = xy.x; mouse.y = xy.y;
+  if (drag){
+    const dx = xy.x - drag.sx, dy = xy.y - drag.sy;
+    if (Math.abs(dx)+Math.abs(dy) > 4) drag.moved = true;
+    if (drag.moved){
+      VIEW.x = drag.startX - dx/VIEW.scale;
+      VIEW.y = drag.startY - dy/VIEW.scale;
+      CV.classList.add('dragging');
+      hideBuildMenu();
+    }
+  } else {
+    updateHover();
+  }
+}
+function onUp(e){
+  if (!drag) return;
+  CV.classList.remove('dragging');
+  if (!drag.moved){
+    const xy = getEventXY(e);
+    handleClick(xy.x, xy.y);
+  }
+  drag = null;
+}
+
+// 鼠标
+CV.addEventListener('mousedown', onDown);
+addEventListener('mousemove', onMove);
+addEventListener('mouseup', onUp);
+
+// 触屏
+CV.addEventListener('touchstart', e=>{ e.preventDefault(); onDown(e); }, {passive:false});
+CV.addEventListener('touchmove', e=>{ e.preventDefault(); onMove(e); }, {passive:false});
+CV.addEventListener('touchend', e=>{ e.preventDefault(); onUp(e); }, {passive:false});
+
+CV.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const f = e.deltaY > 0 ? 0.9 : 1.1;
+  const before = s2w(e.clientX, e.clientY);
+  VIEW.scale = clamp(VIEW.scale*f, 0.4, 2.2);
+  const after = s2w(e.clientX, e.clientY);
+  VIEW.x += before.x - after.x;
+  VIEW.y += before.y - after.y;
+  hideBuildMenu();
+}, {passive:false});
+
+function updateHover(){
+  const w = s2w(mouse.x, mouse.y);
+  HOVER_SLOT = null;
+  for (const s of SLOTS){
+    if (s.device) continue;
+    if (dist2(w.x,w.y,s.x,s.y) < 18*18){
+      HOVER_SLOT = s;
+      CV.style.cursor = 'pointer';
+      return;
+    }
+  }
+  CV.style.cursor = '';
+}
+
+function handleClick(sx, sy){
+  const w = s2w(sx, sy);
+  for (const s of SLOTS){
+    if (s.device) continue;
+    if (dist2(w.x,w.y,s.x,s.y) < 18*18){
+      showBuildMenu(s, sx, sy);
+      return;
+    }
+  }
+  // 点空白处关菜单
+  hideBuildMenu();
+}
+
+function showBuildMenu(slot, sx, sy){
+  hideBuildMenu();
+  bmenuSlot = slot;
+  const el = document.createElement('div');
+  el.className = 'bmenu';
+  // 屏幕位置
+  const screen = w2s(slot.x, slot.y);
+  el.style.left = screen.x + 'px';
+  el.style.top  = screen.y + 'px';
+  for (const k of DEV_LIST){
+    const d = DEVICES[k];
+    const can = STATE.money >= d.cost;
+    const item = document.createElement('div');
+    item.className = 'bm-item' + (can?'':' cant');
+    item.innerHTML = `
+      <div class="bm-ico">${d.ico}</div>
+      <div class="bm-name">${d.name}</div>
+      <div class="bm-cost ${can?'':'cant'}">$${d.cost}${d.power?' ⚡'+d.power:''}</div>
+    `;
+    item.title = d.desc;
+    if (can){
+      item.addEventListener('click', ev=>{
+        ev.stopPropagation();
+        buildAt(slot, k);
+        hideBuildMenu();
+      });
+    }
+    el.appendChild(item);
+  }
+  document.body.appendChild(el);
+  bmenuEl = el;
+}
+
+function hideBuildMenu(){
+  if (bmenuEl){ bmenuEl.remove(); bmenuEl = null; }
+  bmenuSlot = null;
+}
+
+function buildAt(slot, devKey){
+  const d = DEVICES[devKey];
+  if (STATE.money < d.cost) return;
+  STATE.money -= d.cost;
+  const dev = {
+    type: devKey,
+    x: slot.x, y: slot.y,
+    hp: d.hp || 50,
+    cd: 0,
+    angle: 0,
+    flash: 0,
+    healPulse: 0,
+  };
+  slot.device = dev;
+  PLACED.push(dev);
+  recalcPower();
+  // 建造特效
+  for (let k=0;k<12;k++){
+    PARTICLES.push({
+      x:slot.x, y:slot.y,
+      vx:rnd(-80,80), vy:rnd(-80,80),
+      life:0.5, max:0.5, color:d.color, size:2, kind:'spark',
+    });
+  }
+  spawnFloat(slot.x, slot.y - 16, '-$' + d.cost, 'dmg');
+}
+
+addEventListener('keydown', e=>{
+  if (e.code === 'Escape') hideBuildMenu();
+});
+
+/* ----------------------------- HUD ----------------------------- */
+function refreshHUD(){
+  document.getElementById('r-money').textContent = Math.floor(STATE.money);
+  document.getElementById('r-money-rate').textContent = '+' + moneyRate().toFixed(1) + '/s';
+  document.getElementById('r-power').textContent = STATE.powerGen;
+  document.getElementById('r-power-bal').textContent = STATE.powerUse + '/' + STATE.powerGen;
+  document.getElementById('cl-day').textContent = 'Day ' + TIME.day;
+  document.getElementById('cl-time').textContent = clockText();
+  const ph = STATE.inWave ? `攻击 第${STATE.wave}波` : `休整 ${Math.ceil(STATE.waveTimer)}s`;
+  document.getElementById('cl-phase').textContent = ph;
+  document.getElementById('clock').classList.toggle('alert', STATE.inWave);
+}
+
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
