@@ -1648,3 +1648,171 @@ ul { list-style: none; padding: 0; margin: 0; }
   .vp-place { font-size: 9px; padding: 3px 8px; }
 }
 
+/* ============================================================
+   ★ 探索模式 · 房间层 + 热区 ★
+   ============================================================ */
+.room-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  cursor: default;
+}
+.room-stage {
+  position: absolute;
+  inset: 0;
+  /* 1080×1920 坐标空间,通过 transform 适配 */
+}
+
+/* ---- 热区(默认完全隐形) ---- */
+.hotspot {
+  position: absolute;
+  /* x/y/w/h 由内联 style 设置(% 单位) */
+  cursor: pointer;
+  border-radius: 50% / 40%;
+  transition:
+    box-shadow 0.4s ease,
+    background 0.4s ease,
+    opacity 0.6s ease,
+    transform 0.4s ease,
+    filter 0.4s ease;
+  z-index: 5;
+}
+.hotspot::before {
+  /* 暖光晕(默认 0) */
+  content: "";
+  position: absolute;
+  inset: -28%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 50%, rgba(244,232,200,0.32) 0%, rgba(244,232,200,0.12) 35%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  z-index: -1;
+}
+.hotspot:hover::before { opacity: 1; }
+.hotspot:hover { filter: brightness(1.15); }
+
+/* ---- 标签 ---- */
+.hotspot-label {
+  position: absolute;
+  left: 50%;
+  bottom: -28px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: rgba(255,255,255,0.78);
+  text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+  white-space: nowrap;
+  font-family: "PingFang SC", sans-serif;
+}
+.hotspot:hover .hotspot-label { opacity: 1; }
+
+/* ---- 已读冷态 ---- */
+.hotspot.cold::before {
+  background: radial-gradient(ellipse at 50% 50%, rgba(168,184,200,0.22) 0%, rgba(168,184,200,0.08) 40%, transparent 70%);
+}
+.hotspot.cold { filter: saturate(0.65) brightness(0.92); }
+.hotspot.cold:hover { filter: saturate(0.7) brightness(1.0); }
+.hotspot.cold .hotspot-label { color: rgba(180,190,200,0.62); }
+.hotspot.cold .hotspot-label::after { content: " ·"; }
+
+/* ---- 关键剧情:呼吸引导 ---- */
+.hotspot.breathing::before {
+  opacity: 1;
+  animation: hotBreath 3s ease-in-out infinite;
+}
+.hotspot.breathing { animation: hotBreathBody 3s ease-in-out infinite; }
+@keyframes hotBreath {
+  0%,100% { opacity: 0.45; }
+  50%     { opacity: 0.85; }
+}
+@keyframes hotBreathBody {
+  0%,100% { filter: brightness(1.0); }
+  50%     { filter: brightness(1.06); }
+}
+
+/* ---- 入场闪 ---- */
+.hotspot.intro-flash::before {
+  animation: hotIntroFlash 1.5s ease-out;
+}
+@keyframes hotIntroFlash {
+  0%   { opacity: 0; }
+  30%  { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+
+/* ---- 新出现的热区(淡入 + 一次呼吸) ---- */
+.hotspot.new-spawn {
+  animation: hotNewSpawn 1.2s ease-out;
+}
+@keyframes hotNewSpawn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ---- 被点中的"剧烈一下"再收 ---- */
+.hotspot.zap::before {
+  opacity: 1 !important;
+  animation: hotZap 0.5s ease;
+}
+@keyframes hotZap {
+  0%   { opacity: 1; transform: scale(1); }
+  40%  { opacity: 1; transform: scale(1.3); filter: brightness(2); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+
+/* ---- 房间右下提示 ---- */
+.room-hint {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  z-index: 6;
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: rgba(212,168,87,0.55);
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(212,168,87,0.3);
+  padding: 4px 10px;
+  pointer-events: none;
+  animation: roomHintIn 1.2s ease 0.5s both;
+}
+@keyframes roomHintIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; }
+}
+.room-hint.fade { opacity: 0; transition: opacity 1s; }
+
+/* ---- 探索 → 戏剧 过渡:推近 ---- */
+.viewport.zooming .bg-layer,
+.viewport.zooming .room-stage {
+  transition: transform 0.6s ease, filter 0.6s ease;
+  transform-origin: var(--zoom-x, 50%) var(--zoom-y, 50%);
+  transform: scale(1.18);
+  filter: brightness(0.85);
+}
+.viewport.zooming .hotspot:not(.zap) {
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.viewport.zooming .room-hint { opacity: 0; }
+
+/* ---- 戏剧模式时房间层隐藏 ---- */
+.viewport.cinema .room-layer { pointer-events: none; opacity: 0; transition: opacity 0.4s; }
+.viewport.explore .room-layer { opacity: 1; }
+
+/* ---- viewport 比例锁定(竖屏 9:16) ---- */
+.viewport {
+  aspect-ratio: 9 / 16;
+  max-height: calc(100vh - 96px);
+  align-self: center;
+  width: 100%;
+}
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  align-items: stretch;
+}
+

@@ -34,6 +34,15 @@
     <div class="bg-layer" id="bg-layer" data-view="black"></div>
     <div class="bg-layer next" id="bg-layer-next" hidden></div>
 
+    <!-- ★ 探索模式房间层(竖屏 1080×1920 坐标) -->
+    <div class="room-layer" id="room-layer" hidden>
+      <div class="room-stage" id="room-stage">
+        <!-- room.js 动态注入 .hotspot 元素 -->
+      </div>
+      <div class="room-label" id="room-label" hidden></div>
+      <div class="room-hint" id="room-hint" hidden>↻ 在房间里探索吧</div>
+    </div>
+
     <!-- 立绘层 -->
     <div class="char-layer" id="char-layer"></div>
 
@@ -152,6 +161,7 @@
 <script src="js/ui.js"></script>
 <script src="js/scene.js"></script>
 <script src="js/scenes.js"></script>
+<script src="js/room.js"></script>
 <script src="js/main.js"></script>
 
 </body>
