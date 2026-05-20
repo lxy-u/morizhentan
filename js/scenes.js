@@ -66,18 +66,12 @@ SCENES.S1_tutorial = [
   { type: "narration", style: "think", text: "(关节像生锈的合页。你坐起来。)" },
 
   { type: "unlock",
-    tag: "📖 基础操作",
-    title: "怎么玩",
-    body: "▸ 房间里能互动的东西,鼠标移上去会发光。\n▸ 点一下,它就会发生一段戏。\n▸ 戏演完,你回到房间,继续摸索。\n▸ 看够了想出门?门会告诉你。" },
+    tag: "📖 怎么玩",
+    title: "Day 1 · 早晨",
+    body: "▸ 房间里能互动的东西,鼠标移上去会发光。\n▸ 点一下,它就会发生一段戏。\n▸ 看够 3 件东西,你才会有「该开始今天了」的感觉。\n▸ 然后会进入公寓主屏 — 那里有菜园 / 净水 / 工作台 / 邻居 / 防守。" },
 
-  { type: "unlock",
-    tag: "🔓 新系统",
-    title: "状态",
-    body: "你有 5 项数值:精力 / 理智 / 物资 / 声望 / 腐化度。\n点底部「我」可查。\n物资 35 偏低 — 出门得想想。",
-    system: "status" },
-
-  // 进入房间!
-  { type: "fn", fn: () => ROOM.enter("bedroom") },
+  // ★ 标记:正在 morning 探索
+  { type: "fn", fn: () => { STATE.flags.morning_exploring = true; ROOM.enter("bedroom"); } },
 ];
 
 // 兼容旧入口
@@ -410,15 +404,16 @@ SCENES.S4_end = [
   { type: "fade",
     bg: "#000",
     lines: [
-      { text: "Day 1 · 第一场 · 完", cls: "title" },
+      { text: "Day 1 · 醒来 完", cls: "title" },
       { text: " " },
-      { text: "下一场", cls: "sub" },
-      { text: "出门 — 街道 — 残光社", cls: "sub" },
+      { text: "回到公寓 · 开始今天", cls: "sub" },
     ],
   },
-  { type: "place", name: "—— 待续 ——" },
-  { type: "narration", style: "system", text: "本场结束。" },
-  { type: "narration", text: "(后续场景需要新一批文案才能继续。)" },
-  { type: "narration", text: "你可以打开底部「我 / 背包 / 案件 / 地图」回顾这场拿到的东西。" },
-  { type: "end" },
+  // ★ 不再 end,而是进入公寓主屏开始当日
+  { type: "fn", fn: () => {
+    STATE.flags.morning_exploring = false;
+    if (window.WORLD) WORLD.setTime(8, 30);
+    if (window.APT)   APT.show();
+    addNotice("📋 该开始今天的日子了");
+  } },
 ];

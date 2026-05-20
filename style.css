@@ -1649,6 +1649,393 @@ ul { list-style: none; padding: 0; margin: 0; }
 }
 
 /* ============================================================
+   ★ 公寓俯视主屏(躺平末世) ★
+   ============================================================ */
+.apt-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(150,180,220,0.10) 0%, transparent 40%),
+    linear-gradient(180deg, #0b0a10 0%, #0a0808 100%);
+  transition: filter 0.8s ease, background 0.8s ease;
+}
+.apt-layer.dusk  { filter: hue-rotate(-12deg) saturate(0.9) brightness(0.9); background: linear-gradient(180deg, #1a0e10 0%, #0a0608 100%); }
+.apt-layer.night { filter: brightness(0.55) saturate(0.7); background: linear-gradient(180deg, #06080e 0%, #02030a 100%); }
+.apt-layer.morning { filter: brightness(1.05); }
+
+/* HUD */
+.apt-hud {
+  padding: 10px 14px 8px;
+  background: rgba(8,7,10,0.65);
+  border-bottom: 1px solid #2a2520;
+  flex-shrink: 0;
+}
+.hud-time {
+  font-size: 12px;
+  color: #d4a857;
+  letter-spacing: 3px;
+  text-align: center;
+  margin-bottom: 6px;
+}
+.hud-res {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.hud-res .res-cell {
+  background: rgba(20,18,16,0.7);
+  border: 1px solid #2a2520;
+  padding: 4px 2px;
+  text-align: center;
+  font-size: 11px;
+  color: #d8d4c8;
+  letter-spacing: 1px;
+}
+.hud-res .res-cell .ic { font-size: 14px; display: block; line-height: 1; margin-bottom: 2px; }
+.hud-res .res-cell.low { color: #c97070; border-color: #8a3a3a; }
+
+/* 公寓平面 */
+.apt-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1.4fr;
+  gap: 6px;
+  padding: 10px 90px 10px 10px;  /* 右留邻居栏空间 */
+  position: relative;
+}
+.apt-zone {
+  position: relative;
+  background: linear-gradient(135deg, #15110c 0%, #0a0808 100%);
+  border: 1px solid #3a2c1c;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.25s;
+}
+.apt-zone.wide { grid-column: span 2; }
+.apt-zone:hover {
+  border-color: #d4a857;
+  filter: brightness(1.18);
+}
+.apt-zone .zone-label {
+  position: absolute;
+  top: 6px; left: 8px;
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: rgba(212,168,87,0.7);
+  text-transform: uppercase;
+  z-index: 5;
+}
+
+/* 区域里的小图标(伪 isometric 占位) */
+.apt-zone[data-zone="garden"]::before {
+  content: ""; position: absolute; inset: 22px 18px 14px;
+  background:
+    radial-gradient(circle 8px at 30% 60%, #4a7a3a 70%, transparent 71%),
+    radial-gradient(circle 8px at 60% 40%, #4a7a3a 70%, transparent 71%),
+    radial-gradient(circle 7px at 80% 70%, #5a8a4a 70%, transparent 71%),
+    linear-gradient(180deg, #2a1f12 0%, #1a1408 100%);
+  border-radius: 4px;
+  box-shadow: inset 0 0 12px rgba(0,0,0,0.5);
+}
+.apt-zone[data-zone="water"]::before {
+  content: ""; position: absolute; inset: 22px 18px 14px;
+  background:
+    radial-gradient(ellipse 24px 40px at 50% 50%, #6a9bd4 60%, #2a4560 80%, transparent 90%),
+    linear-gradient(180deg, #1a1410 0%, #0a0808 100%);
+  border-radius: 4px;
+  box-shadow: inset 0 0 12px rgba(106,155,212,0.3);
+}
+.apt-zone[data-zone="workshop"]::before {
+  content: ""; position: absolute; inset: 22px 14px 12px;
+  background:
+    linear-gradient(135deg, #3a2c1a 0%, #1a1208 100%);
+  border-radius: 4px;
+}
+.apt-zone[data-zone="workshop"]::after {
+  content: "🔧  📦";
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; justify-content: space-evenly;
+  font-size: 28px;
+  opacity: 0.6;
+  filter: grayscale(0.4);
+}
+.apt-zone[data-zone="bedroom"]::before {
+  content: ""; position: absolute; inset: 22px 14px 12px;
+  background:
+    radial-gradient(ellipse 60px 30px at 50% 70%, #4a3a2a 60%, transparent 90%),
+    radial-gradient(ellipse 16px 12px at 50% 50%, #d4b8a0 50%, transparent 100%),
+    linear-gradient(180deg, #1a1208 0%, #0a0808 100%);
+  border-radius: 4px;
+}
+.apt-zone[data-zone="hallway"]::before {
+  content: ""; position: absolute; inset: 22px 14px 12px;
+  background:
+    /* 门 */
+    linear-gradient(180deg, #3a2810 0%, #1a1006 100%) right top / 24% 80% no-repeat,
+    /* 镜子 */
+    radial-gradient(ellipse 14px 28px at 22% 50%, rgba(180,140,90,0.5) 50%, transparent 90%),
+    linear-gradient(180deg, #1a1208 0%, #0a0808 100%);
+  border-radius: 4px;
+}
+
+/* 区域上的"提示徽章" — 例如新事件/低 hp/可领取 */
+.apt-zone .badge {
+  position: absolute;
+  top: 6px; right: 6px;
+  z-index: 6;
+  background: #b85c5c;
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 9px;
+  box-shadow: 0 0 8px #b85c5c;
+  animation: zoneBadge 1.8s infinite;
+}
+@keyframes zoneBadge {
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(1.15); }
+}
+.apt-zone .badge.gold { background: #d4a857; box-shadow: 0 0 8px #d4a857; }
+
+/* 邻居栏(右侧条) */
+.nbr-rail {
+  position: absolute;
+  right: 4px;
+  top: 70px;
+  bottom: 4px;
+  width: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 4;
+  padding: 4px 0;
+}
+.nbr-cell {
+  background: rgba(15,12,18,0.85);
+  border: 1px solid #3a3530;
+  padding: 6px 4px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+.nbr-cell:hover {
+  border-color: #d4a857;
+  background: rgba(38,28,18,0.95);
+}
+.nbr-cell .nbr-avatar {
+  font-size: 20px;
+  margin-bottom: 2px;
+}
+.nbr-cell .nbr-name {
+  font-size: 10px;
+  color: #d8d4c8;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nbr-cell .nbr-rel {
+  font-size: 9px;
+  color: #b85c5c;
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+.nbr-cell .nbr-hp {
+  height: 3px;
+  background: #2a2520;
+  margin-top: 4px;
+  position: relative;
+  overflow: hidden;
+}
+.nbr-cell .nbr-hp > div {
+  height: 100%;
+  background: linear-gradient(90deg, #7ab368, #4a8a3a);
+  transition: width 0.4s;
+}
+.nbr-cell.dead { opacity: 0.4; filter: grayscale(1); }
+.nbr-cell.dead .nbr-name::after { content: " ✕"; color: #b85c5c; }
+
+/* 行动菜单 */
+.action-sheet {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  background: rgba(8,7,10,0.96);
+  border-top: 1px solid #d4a857;
+  padding: 16px 18px 22px;
+  z-index: 50;
+  animation: actSlideUp 0.25s ease;
+}
+@keyframes actSlideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.as-head {
+  font-size: 13px;
+  letter-spacing: 4px;
+  color: #d4a857;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.as-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.as-act {
+  background: rgba(20,18,16,0.9);
+  border: 1px solid #3a3530;
+  color: #d8d4c8;
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 14px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.as-act:hover:not(:disabled) {
+  border-color: #d4a857;
+  background: rgba(38,28,18,0.95);
+}
+.as-act:disabled { opacity: 0.4; cursor: not-allowed; }
+.as-act .as-cost {
+  display: block;
+  font-size: 11px;
+  color: #8a7e6a;
+  margin-top: 4px;
+  letter-spacing: 1px;
+}
+.as-act .as-cost.bad { color: #c97070; }
+.as-close {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #5a4030;
+  color: #8a7e6a;
+  letter-spacing: 4px;
+  font-size: 12px;
+}
+
+/* ============================================================
+   ★ 夜晚防守 ★
+   ============================================================ */
+.defense-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+}
+.def-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(180,60,60,0.25) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 100%, rgba(40,80,30,0.20) 0%, transparent 60%),
+    linear-gradient(180deg, #0c0608 0%, #1a0a0a 100%);
+}
+.def-hud {
+  position: relative;
+  z-index: 2;
+  padding: 14px;
+  text-align: center;
+  background: rgba(0,0,0,0.6);
+  color: #d4a857;
+  letter-spacing: 3px;
+  font-size: 13px;
+}
+.def-hud .def-time { color: #b85c5c; }
+.def-hud .def-door {
+  margin-top: 8px;
+  height: 12px;
+  background: #2a1010;
+  border: 1px solid #5a2a2a;
+  overflow: hidden;
+  position: relative;
+}
+.def-hud .def-door > div {
+  height: 100%;
+  background: linear-gradient(90deg, #c97070, #8a3a3a);
+  transition: width 0.3s;
+}
+.def-hud .def-door-lbl {
+  font-size: 10px;
+  color: #8a7e6a;
+  margin-top: 4px;
+  letter-spacing: 2px;
+}
+.def-arena {
+  flex: 1;
+  position: relative;
+  cursor: crosshair;
+  overflow: hidden;
+  z-index: 2;
+}
+.zombie {
+  position: absolute;
+  width: 48px; height: 48px;
+  background:
+    radial-gradient(circle at 50% 40%, #6a8a4a 30%, #3a5028 80%);
+  border-radius: 50%;
+  border: 2px solid #2a3a18;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  color: #1a0a0a;
+  cursor: crosshair;
+  animation: zombieWiggle 0.6s infinite ease-in-out;
+}
+@keyframes zombieWiggle {
+  0%,100% { transform: rotate(-3deg); }
+  50%     { transform: rotate(3deg); }
+}
+.zombie.hit {
+  animation: zombieHit 0.3s ease;
+}
+@keyframes zombieHit {
+  0%   { filter: brightness(3) saturate(2); transform: scale(1.2); }
+  100% { filter: brightness(1); transform: scale(0); opacity: 0; }
+}
+.shot-flash {
+  position: absolute;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, transparent 70%);
+  pointer-events: none;
+  animation: shotFlash 0.3s ease;
+}
+@keyframes shotFlash {
+  from { opacity: 1; transform: scale(0.5); }
+  to   { opacity: 0; transform: scale(1.5); }
+}
+.def-end {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: rgba(0,0,0,0.9);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: #d4a857;
+  text-align: center;
+  padding: 30px;
+}
+.def-end h2 { font-size: 28px; letter-spacing: 8px; margin-bottom: 16px; }
+.def-end p  { font-size: 14px; color: #b8b0a0; line-height: 2; }
+.def-end button {
+  margin-top: 24px;
+  padding: 12px 32px;
+  border: 1px solid #d4a857;
+  color: #d4a857;
+  letter-spacing: 4px;
+}
+
+/* ============================================================
    ★ 探索模式 · 房间层 + 热区 ★
    ============================================================ */
 .room-layer {

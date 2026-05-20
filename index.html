@@ -34,6 +34,41 @@
     <div class="bg-layer" id="bg-layer" data-view="black"></div>
     <div class="bg-layer next" id="bg-layer-next" hidden></div>
 
+    <!-- ★ 公寓俯视主屏 (躺平末世主舞台) -->
+    <div class="apt-layer" id="apt-layer" hidden>
+      <!-- 顶部 HUD:时钟 + 资源 -->
+      <div class="apt-hud" id="apt-hud">
+        <div class="hud-time" id="hud-time">Day 1 · 07:23 · 🌅</div>
+        <div class="hud-res" id="hud-res"></div>
+      </div>
+      <!-- 公寓平面:2 列 × 3 行分区 -->
+      <div class="apt-grid" id="apt-grid">
+        <div class="apt-zone" data-zone="garden">
+          <div class="zone-label">菜园</div>
+        </div>
+        <div class="apt-zone" data-zone="water">
+          <div class="zone-label">净水器</div>
+        </div>
+        <div class="apt-zone wide" data-zone="workshop">
+          <div class="zone-label">工作台 + 储物</div>
+        </div>
+        <div class="apt-zone" data-zone="bedroom">
+          <div class="zone-label">卧室</div>
+        </div>
+        <div class="apt-zone" data-zone="hallway">
+          <div class="zone-label">客厅 + 玄关</div>
+        </div>
+      </div>
+      <!-- 邻居侧栏 -->
+      <div class="nbr-rail" id="nbr-rail"></div>
+      <!-- 行动菜单(底部弹出) -->
+      <div class="action-sheet" id="action-sheet" hidden>
+        <div class="as-head" id="as-head"></div>
+        <div class="as-body" id="as-body"></div>
+        <button class="as-close" id="as-close">关闭</button>
+      </div>
+    </div>
+
     <!-- ★ 探索模式房间层(竖屏 1080×1920 坐标) -->
     <div class="room-layer" id="room-layer" hidden>
       <div class="room-stage" id="room-stage">
@@ -41,6 +76,14 @@
       </div>
       <div class="room-label" id="room-label" hidden></div>
       <div class="room-hint" id="room-hint" hidden>↻ 在房间里探索吧</div>
+    </div>
+
+    <!-- ★ 夜晚防守层 -->
+    <div class="defense-layer" id="defense-layer" hidden>
+      <div class="def-bg"></div>
+      <div class="def-hud" id="def-hud"></div>
+      <div class="def-arena" id="def-arena"></div>
+      <div class="def-end" id="def-end" hidden></div>
     </div>
 
     <!-- 立绘层 -->
@@ -162,6 +205,11 @@
 <script src="js/scene.js"></script>
 <script src="js/scenes.js"></script>
 <script src="js/room.js"></script>
+<script src="js/world.js"></script>
+<script src="js/neighbors.js"></script>
+<script src="js/apartment.js"></script>
+<script src="js/defense.js"></script>
+<script src="js/story.js"></script>
 <script src="js/main.js"></script>
 
 </body>
