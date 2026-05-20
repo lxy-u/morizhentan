@@ -1284,3 +1284,367 @@ ul { list-style: none; padding: 0; margin: 0; }
   border-right: 2px solid transparent;
 }
 
+/* ============================================================
+   ★ 影视布局 viewport ★
+   ============================================================ */
+.viewport {
+  position: relative;
+  overflow: hidden;
+  background: #000;
+  cursor: pointer;
+}
+.scene.legacy { display: none; }
+
+/* 背景层 */
+.bg-layer {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  transition: opacity 0.6s ease;
+  z-index: 1;
+}
+.bg-layer.next { z-index: 2; opacity: 0; }
+.bg-layer.next.show { opacity: 1; }
+
+/* 立绘层 */
+.char-layer {
+  position: absolute;
+  right: 4%;
+  bottom: 16%;
+  width: 38%;
+  max-width: 280px;
+  height: 70%;
+  z-index: 5;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  filter: drop-shadow(0 8px 24px rgba(0,0,0,0.6));
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.char-layer.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.char-layer svg { width: 100%; height: 100%; }
+
+/* 场景小角标 */
+.vp-place {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 10;
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: #d4a857;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid #5a4030;
+  padding: 4px 12px;
+  text-transform: uppercase;
+  animation: vpPlaceIn 0.6s ease both;
+}
+@keyframes vpPlaceIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; } }
+
+/* 字幕条 */
+.subtitle-bar {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 20;
+  padding: 22px 24px 26px;
+  background: linear-gradient(0deg, rgba(8,7,10,0.92) 0%, rgba(8,7,10,0.78) 60%, transparent 100%);
+  color: #f0e8d4;
+  font-family: "PingFang SC", "Songti SC", serif;
+  min-height: 26%;
+  animation: subIn 0.35s ease both;
+}
+@keyframes subIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; } }
+.subtitle-bar::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 22px; right: 22px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212,168,87,0.6), transparent);
+}
+.speaker-name {
+  display: inline-block;
+  font-size: 13px;
+  letter-spacing: 4px;
+  color: #d4a857;
+  padding-bottom: 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px dashed rgba(212,168,87,0.3);
+}
+.speaker-name.suning  { color: #d4a857; }
+.speaker-name.ahmo    { color: #c879b8; }
+.speaker-name.gucheng { color: #8aa8c4; }
+.speaker-name.mom     { color: #b89060; }
+.speaker-name.chenzhi { color: #5a5550; text-decoration: line-through; }
+.speaker-name.zou     { color: #7ab368; }
+.speaker-name.maocat  { color: #6a9bd4; }
+.subtitle-text {
+  font-size: 16px;
+  line-height: 1.85;
+  letter-spacing: 0.5px;
+  min-height: 1.85em;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+}
+.subtitle-text.think  { color: #b8b0c4; font-style: italic; }
+.subtitle-text.sfx    { color: #8aa898; font-size: 14px; }
+.subtitle-text.system { color: #6a9bd4; font-size: 13px; letter-spacing: 2px; }
+.subtitle-hint {
+  position: absolute;
+  right: 16px; bottom: 8px;
+  font-size: 10px;
+  color: #6a5f55;
+  letter-spacing: 3px;
+  animation: blink 1.6s infinite;
+}
+
+/* 选项层 */
+.choice-layer {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 30;
+  padding: 20px 24px 28px;
+  background: linear-gradient(0deg, rgba(8,7,10,0.96) 0%, rgba(8,7,10,0.85) 70%, transparent 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: subIn 0.4s ease both;
+}
+.choice-layer .choice {
+  background: rgba(18,16,14,0.92);
+  border: 1px solid #6a5030;
+  color: #f0e8d4;
+  padding: 14px 18px;
+  text-align: left;
+  font-size: 15px;
+  line-height: 1.55;
+  transition: all 0.18s;
+  position: relative;
+  backdrop-filter: blur(4px);
+}
+.choice-layer .choice::before {
+  content: "▸";
+  margin-right: 10px;
+  color: #d4a857;
+}
+.choice-layer .choice:hover {
+  border-color: #d4a857;
+  background: rgba(38,28,18,0.96);
+  transform: translateX(4px);
+}
+.choice-layer .choice .cost {
+  display: inline-block;
+  margin-left: 12px;
+  font-size: 11px;
+  color: #8a7e6a;
+  letter-spacing: 1px;
+}
+
+/* 回看按钮 + 面板 */
+.backlog-btn {
+  position: absolute;
+  top: 14px; right: 14px;
+  z-index: 25;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #8a7e6a;
+  border: 1px solid #3a3530;
+  padding: 4px 10px;
+  background: rgba(0,0,0,0.4);
+}
+.backlog-btn:hover { color: #d4a857; border-color: #d4a857; }
+.backlog-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0,0,0,0.92);
+  display: flex; flex-direction: column;
+  animation: fadeIn 0.2s;
+}
+.backlog-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid #2a2520;
+  color: #d4a857; font-size: 13px; letter-spacing: 4px;
+}
+.backlog-close { font-size: 22px; color: #8a7e6a; }
+.backlog-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px 30px;
+  font-size: 13px;
+  line-height: 1.85;
+}
+.backlog-body .bl-line { margin: 4px 0; }
+.backlog-body .bl-line .who { color: #d4a857; margin-right: 8px; }
+.backlog-body .bl-line.think { color: #b8b0c4; font-style: italic; }
+.backlog-body .bl-line.sfx { color: #8aa898; font-size: 12px; }
+.backlog-body .bl-line.system { color: #6a9bd4; font-size: 12px; letter-spacing: 1px; }
+
+/* ============================================================
+   ★ 场景背景:CSS 精画占位 ★
+   ============================================================ */
+
+/* 通用:大气层渐变 */
+.bg-layer { background-position: center; background-size: cover; }
+
+/* —— 黑屏 / 白屏 —— */
+.bg-layer[data-view="black"] { background: #000; }
+.bg-layer[data-view="white"] { background: #f5f0e6; }
+
+/* —— 卧室全景:从左到右 窗 / 床 / 床头柜 / 资料墙残迹 / 玄关门 —— */
+.bg-layer[data-view="bedroom"] {
+  background:
+    /* 远景天光 */
+    radial-gradient(ellipse at 18% 25%, rgba(150,170,200,0.25) 0%, transparent 50%),
+    /* 床头暖灯 */
+    radial-gradient(ellipse at 52% 60%, rgba(220,180,100,0.30) 0%, transparent 35%),
+    /* 玄关门走廊冷光 */
+    radial-gradient(ellipse at 88% 55%, rgba(80,120,180,0.18) 0%, transparent 35%),
+    /* 房间主色 */
+    linear-gradient(180deg, #0e0c10 0%, #14110d 55%, #1a140e 100%);
+}
+.bg-layer[data-view="bedroom"]::before {
+  content: "";
+  position: absolute;
+  /* 地板 */
+  left: 0; right: 0; bottom: 0; height: 30%;
+  background: linear-gradient(180deg, #1a1410 0%, #08060a 100%);
+  border-top: 1px solid #2a1f18;
+}
+.bg-layer[data-view="bedroom"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* 床的剪影(中间下方) */
+  background:
+    /* 床头柜 */
+    radial-gradient(ellipse 70px 50px at 58% 78%, #2a1f18 70%, transparent 71%),
+    /* 床 */
+    radial-gradient(ellipse 180px 60px at 38% 76%, #3a2a20 70%, transparent 71%),
+    /* 窗户 */
+    radial-gradient(ellipse 120px 90px at 16% 38%, rgba(150,170,200,0.4) 0%, rgba(80,100,140,0.2) 70%, transparent 75%),
+    /* 玄关门长方 */
+    linear-gradient(transparent 25%, transparent 70%, #1a1006 70%, #1a1006 95%, transparent 95%);
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+/* —— 床头柜俯视(笔记本/手机/凉茶/闹钟) —— */
+.bg-layer[data-view="bedside"] {
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(220,180,100,0.20) 0%, transparent 60%),
+    linear-gradient(180deg, #1a1410 0%, #0c0808 100%);
+}
+.bg-layer[data-view="bedside"]::before {
+  content: "";
+  position: absolute;
+  left: 8%; right: 8%; top: 18%; bottom: 18%;
+  background:
+    /* 笔记本 */
+    linear-gradient(135deg, #6a4830 0%, #4a2e1a 100%) left top / 28% 50% no-repeat,
+    /* 手机黑色 */
+    linear-gradient(180deg, #1a1a20, #0a0a0c) right top / 22% 42% no-repeat,
+    /* 闹钟红色圆 */
+    radial-gradient(circle at 20% 85%, #8a2a2a 0%, #5a1818 12%, transparent 13%),
+    /* 凉茶杯白色 */
+    radial-gradient(circle at 78% 88%, #d4d4c8 0%, #b8b0a0 10%, transparent 11%),
+    /* 桌面 */
+    linear-gradient(180deg, #2a1f18 0%, #15100c 100%);
+  border: 4px solid #2a1f18;
+  border-radius: 4px;
+  box-shadow: inset 0 0 40px rgba(0,0,0,0.6);
+}
+
+/* —— 床底铝盒(隐藏分支前一刻) —— */
+.bg-layer[data-view="underbed"] {
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(212,168,87,0.10) 0%, transparent 50%),
+    linear-gradient(180deg, #08060a 0%, #14100c 60%, #1a1410 100%);
+}
+.bg-layer[data-view="underbed"]::before {
+  content: "";
+  position: absolute;
+  /* 床底阴影 */
+  left: 0; right: 0; top: 0; height: 50%;
+  background: linear-gradient(180deg, #000 30%, transparent 100%);
+}
+.bg-layer[data-view="underbed"]::after {
+  content: "";
+  position: absolute;
+  left: 50%; bottom: 30%;
+  transform: translateX(-50%);
+  width: 50%; aspect-ratio: 5/3;
+  background: linear-gradient(135deg, #4a4a4a 0%, #2a2a2a 100%);
+  border: 4px solid #1a1a1a;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.7);
+}
+
+/* —— 玄关(镜子 + 鞋 + 门) —— */
+.bg-layer[data-view="hallway"] {
+  background:
+    radial-gradient(ellipse at 50% 35%, rgba(220,180,100,0.18) 0%, transparent 55%),
+    linear-gradient(180deg, #14110e 0%, #08070a 100%);
+}
+.bg-layer[data-view="hallway"]::before {
+  content: "";
+  position: absolute;
+  /* 镜子边框 */
+  left: 16%; top: 12%; width: 30%; height: 72%;
+  border: 10px solid;
+  border-image: linear-gradient(180deg, #6a5030, #3a2818) 1;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(180,140,90,0.22) 0%, transparent 55%),
+    linear-gradient(180deg, #2a2820 0%, #14120e 100%);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.6), inset 0 0 30px rgba(0,0,0,0.5);
+}
+.bg-layer[data-view="hallway"]::after {
+  content: "";
+  position: absolute;
+  /* 门 */
+  right: 12%; top: 8%; width: 28%; height: 80%;
+  background:
+    linear-gradient(180deg, #2a1808 0%, #1a1006 100%);
+  border: 6px solid #3a2810;
+  box-shadow: inset 0 0 30px rgba(0,0,0,0.5);
+}
+
+/* —— 桌面/玩具柜等通用空场景:可后续加 —— */
+
+/* —— 推门白光后的过渡 —— */
+.bg-layer[data-view="doorway"] {
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(255,240,200,0.85) 0%, rgba(255,220,170,0.5) 30%, rgba(80,60,40,0.6) 60%, #000 90%);
+}
+
+/* —— 街道远景(后用) —— */
+.bg-layer[data-view="street"] {
+  background:
+    linear-gradient(180deg, #2a3548 0%, #4a4a50 55%, #2a2520 100%);
+}
+
+/* ============================================================
+   过场动画
+   ============================================================ */
+.viewport.flash {
+  animation: vpFlash 1.6s ease;
+}
+@keyframes vpFlash {
+  0%   { filter: brightness(1); }
+  40%  { filter: brightness(8) saturate(0); }
+  100% { filter: brightness(1); }
+}
+
+/* ============================================================
+   响应式
+   ============================================================ */
+@media (max-width: 600px) {
+  .subtitle-text { font-size: 15px; }
+  .char-layer { width: 48%; }
+  .vp-place { font-size: 9px; padding: 3px 8px; }
+}
+

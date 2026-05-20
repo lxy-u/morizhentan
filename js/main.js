@@ -33,6 +33,14 @@
     }
   });
 
+  // 视口点击推进
+  if (window.bindViewportAdvance) bindViewportAdvance();
+  // 回看面板
+  const blBtn = document.getElementById("backlog-btn");
+  const blClose = document.getElementById("backlog-close");
+  if (blBtn)   blBtn.addEventListener("click",   () => toggleBacklog(true));
+  if (blClose) blClose.addEventListener("click", () => toggleBacklog(false));
+
   // 启动 S1
   SCENE.play(SCENES.S1);
 

@@ -27,17 +27,45 @@
     </div>
   </header>
 
-  <!-- 主场景区 -->
-  <main class="stage" id="stage">
+  <!-- 主场景区(影视布局) -->
+  <main class="viewport" id="viewport">
 
-    <!-- 剧情/对话渲染区 -->
-    <div class="scene" id="scene">
-      <div class="scene-place" id="scene-place">主角公寓 · 卧室</div>
+    <!-- 背景层(可切换) -->
+    <div class="bg-layer" id="bg-layer" data-view="black"></div>
+    <div class="bg-layer next" id="bg-layer-next" hidden></div>
+
+    <!-- 立绘层 -->
+    <div class="char-layer" id="char-layer"></div>
+
+    <!-- 场景地点小角标 -->
+    <div class="vp-place" id="vp-place" hidden></div>
+
+    <!-- 字幕条 -->
+    <div class="subtitle-bar" id="subtitle-bar" hidden>
+      <div class="speaker-name" id="speaker-name" hidden></div>
+      <div class="subtitle-text" id="subtitle-text"></div>
+      <div class="subtitle-hint" id="subtitle-hint">▾ 点击继续</div>
+    </div>
+
+    <!-- 选项层 -->
+    <div class="choice-layer" id="choice-layer" hidden></div>
+
+    <!-- 回看按钮 -->
+    <button class="backlog-btn" id="backlog-btn" hidden>📜 回看</button>
+    <div class="backlog-panel" id="backlog-panel" hidden>
+      <div class="backlog-head">
+        <span>本场已发生</span>
+        <button class="backlog-close" id="backlog-close">×</button>
+      </div>
+      <div class="backlog-body" id="backlog-body"></div>
+    </div>
+
+    <!-- 剧情(老滚动版,保留为隐藏的兼容容器) -->
+    <div class="scene legacy" id="scene" hidden>
+      <div class="scene-place" id="scene-place"></div>
       <div class="narration" id="narration"></div>
       <div class="choices" id="choices"></div>
-      <div class="continue-hint" id="continue-hint" hidden>
-        <span>点击继续</span>
-      </div>
+      <div class="continue-hint" id="continue-hint" hidden><span>点击继续</span></div>
     </div>
 
   </main>
@@ -118,6 +146,7 @@
 </div>
 
 <script src="js/audio.js"></script>
+<script src="js/portraits.js"></script>
 <script src="js/data.js"></script>
 <script src="js/state.js"></script>
 <script src="js/ui.js"></script>

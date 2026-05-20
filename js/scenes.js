@@ -39,20 +39,21 @@ SCENES.opening = [
 // S1: 闹钟特写 + 首句独白
 // ============================================================
 SCENES.S1_alarm = [
+  { type: "bg",    view: "bedroom" },
   { type: "place", name: "苏宁的公寓 · 卧室" },
   { type: "sfx",   name: "alarm" },
   { type: "cg",    view: "bedside" },
   { type: "narration", style: "sfx", text: "(闹钟在响)" },
-  { type: "delta", deltas: { } },
   { type: "narration", style: "system", text: "[Day 1 · 末日 7 年第 23 天 · 07:23]" },
   { type: "narration", text: "你睁开眼。" },
   { type: "narration", text: "天花板还是那块天花板。" },
   { type: "narration", text: "你伸出手,按掉了闹钟。" },
   { type: "sfx",   name: "click" },
 
+  { type: "show",   who: "suning", expr: "tired" },
   { type: "dialog", who: "suning", text: "末日第七年的第 23 天。" },
   { type: "dialog", who: "suning", text: "我活着。" },
-  { type: "dialog", who: "suning", text: "......这件事比想象中无聊。" },
+  { type: "dialog", who: "suning", expr: "bitter", text: "......这件事比想象中无聊。" },
 
   { type: "goto", scene: "S1_tutorial" },
 ];
@@ -61,6 +62,8 @@ SCENES.S1_alarm = [
 // S1.5: 教程 + 状态栏首次出现
 // ============================================================
 SCENES.S1_tutorial = [
+  { type: "hide" },
+  { type: "bg", view: "bedroom" },
   { type: "narration", style: "think", text: "(关节像生锈的合页。你坐起来。)" },
 
   { type: "unlock",
@@ -88,6 +91,8 @@ SCENES.S1_tutorial = [
 // S1.6: 房间循环 — 探索 3 个核心物品 + 隐藏铝盒
 // ============================================================
 SCENES.S1_room = [
+  { type: "bg", view: "bedroom" },
+  { type: "hide" },
   { type: "choice", options: [
       {
         label: "📖 翻开床头那本笔记本",
@@ -122,6 +127,8 @@ function backToRoom() {
     opts.push({ label: "🪟 走到窗边,看看外面", action: () => SCENE.play(SCENES.S1_window) });
   opts.push({ label: "▸ 准备出门(去玄关)", action: () => SCENE.play(SCENES.S1_beforeDoor) });
   SCENE.play([
+    { type: "bg", view: "bedroom" },
+    { type: "hide" },
     { type: "narration", style: "think", text: "(你回到房间中央。)" },
     { type: "choice", options: opts },
   ]);
@@ -132,6 +139,8 @@ window.backToRoom = backToRoom;
 // S1 · 笔记本
 // ============================================================
 SCENES.S1_notebook = [
+  { type: "hide" },
+  { type: "bg", view: "bedside" },
   { type: "narration", text: "你拿起床头那本棕皮笔记本。封面有磨损。" },
   { type: "sfx", name: "page" },
   { type: "closeup", view: "notebookCover", backText: "翻开" },
@@ -149,6 +158,7 @@ SCENES.S1_notebook = [
   { type: "narration", text: "右边那个男人的脸,被笔狠狠划掉了。" },
   { type: "narration", text: "照片背面手写:「2028 春,济州岛」。" },
 
+  { type: "show", who: "suning", expr: "bitter" },
   { type: "dialog", who: "suning", text: "陈志强。" },
   { type: "dialog", who: "suning", text: "我前夫。" },
   { type: "narration", style: "think", text: "(停了一下。)" },
@@ -182,6 +192,8 @@ SCENES.S1_notebook = [
 // S1 · 手机
 // ============================================================
 SCENES.S1_phone = [
+  { type: "hide" },
+  { type: "bg", view: "bedside" },
   { type: "narration", text: "你拿起手机,按亮屏幕。" },
   { type: "sfx", name: "click" },
   { type: "phoneOpen",
@@ -237,6 +249,8 @@ SCENES.S1_phone_mom = [
 // S1 · 窗外
 // ============================================================
 SCENES.S1_window = [
+  { type: "hide" },
+  { type: "bg", view: "bedroom" },
   { type: "narration", text: "你走到窗边。" },
   { type: "cg", view: "window" },
   { type: "narration", text: "灰蒙蒙的天。" },
@@ -263,7 +277,11 @@ SCENES.S1_backRoom = [
 // S2: 床底铝盒(隐藏分支)
 // ============================================================
 SCENES.S1_beforeDoor = [
+  { type: "bg", view: "bedroom" },
+  { type: "show", who: "suning", expr: "tired" },
   { type: "narration", text: "你站起来,准备走向玄关。" },
+  { type: "bg", view: "underbed" },
+  { type: "hide" },
   { type: "narration", style: "think", text: "(走到床尾时,你顿了一下。)" },
   { type: "narration", style: "sfx", text: "(床底下露出一个铝盒的边角。)" },
   { type: "narration", style: "system", text: "[床底好像有东西......]" },
@@ -279,6 +297,7 @@ SCENES.S1_beforeDoor = [
 ];
 
 SCENES.S2_boxOpen = [
+  { type: "bg", view: "underbed" },
   { type: "narration", text: "你蹲下,把铝盒拖出来。" },
   { type: "sfx", name: "knock" },
   { type: "narration", style: "sfx", text: "(金属解锁的声音。)" },
@@ -381,6 +400,8 @@ SCENES.S2_boxSkip = [
 // S3: 玄关镜子前 + 阿默来电 + 推门白光
 // ============================================================
 SCENES.S3_mirror = [
+  { type: "bg", view: "hallway" },
+  { type: "hide" },
   { type: "place", name: "苏宁的公寓 · 玄关" },
   { type: "time", minutes: 12 },
   { type: "narration", text: "你走到玄关。" },
@@ -392,10 +413,11 @@ SCENES.S3_mirror = [
   { type: "narration", style: "think", text: "(深灰风衣,黑色高领,黑色长裤,短靴。)" },
   { type: "narration", style: "think", text: "(左腕一只旧机械手表。右耳一颗小银钉。)" },
 
+  { type: "show", who: "suning", expr: "tired" },
   { type: "dialog", who: "suning", text: "今天是重开侦探社的第 23 天。" },
   { type: "dialog", who: "suning", text: "一个客户都没有。" },
   { type: "narration", style: "think", text: "(看着镜子。)" },
-  { type: "dialog", who: "suning", text: "但我还在。" },
+  { type: "dialog", who: "suning", expr: "determined", text: "但我还在。" },
 
   // —— 阿默电话 ——
   { type: "delay", ms: 600 },
@@ -414,8 +436,9 @@ SCENES.S3_mirror = [
       },
     ],
   },
-  { type: "dialog", who: "suning", text: "......客户。" },
+  { type: "dialog", who: "suning", expr: "neutral", text: "......客户。" },
   { type: "narration", style: "think", text: "(看镜子里的自己,深吸一口气。)" },
+  { type: "show", who: "suning", expr: "determined" },
   { type: "dialog", who: "suning", text: "我开始了。" },
   { type: "learnNPC", id: "ahmo" },
   { type: "rel",      id: "ahmo", delta: 2 },

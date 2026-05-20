@@ -1,11 +1,14 @@
 /* ============================================================
-   scene.js  ——  剧情引擎(beats 序列驱动)
+   scene.js  ——  剧情引擎(影视布局版)
 
-   常用 beat:
-     { type: "place",     name: "..."}
+   beat 类型(原有 + 新增):
+     { type: "place",     name: "..."}                          // 场景小角标
      { type: "narration", text: "...", style: "think|sfx|system" }
-     { type: "dialog",    who: "ahmo|suning|...", text: "..." }
+     { type: "dialog",    who: "suning|ahmo|...", text: "...", expr?:"neutral|tired|bitter|determined|closed" }
      { type: "choice",    options: [{label, deltas?, next?, action?, requiresSkill?, tag?}] }
+     { type: "bg",        view: "bedroom|bedside|window|mirror|..." }   // ★ 切换全屏背景
+     { type: "show",      who: "suning", expr?: "neutral" }             // ★ 显示立绘
+     { type: "hide" }                                                    // ★ 收起立绘
      { type: "delta",     deltas: {energy:-10, ...} }
      { type: "unlock",    title:"..", body:"..", system?:"id", skill?:"id" }
      { type: "learnNPC",  id: "ahmo" }
@@ -18,19 +21,18 @@
      { type: "weather",   text: "小雨" }
      { type: "goto",      scene: "S2" }
      { type: "flag",      key:"..", value:true }
-     { type: "end"}
-
-   新加 beat:
-     { type: "fade",     bg:"#000", lines:[{text,cls?}], hold?:ms, click?:bool }  // 全屏字幕,可点继续
-     { type: "cg",       view:"bedside|window|mirror|box|...", caption?, hold?:ms } // 显示一个 CG 画面
-     { type: "cgClose"}                                                              // 收掉 CG
-     { type: "whiteFlash", to?:scene, delay?:ms }                                    // 推门白光,然后跳场景
-     { type: "phoneOpen", contacts:[...] }                                           // 打开手机微信列表
+     { type: "fade",      bg:"#000", lines:[{text,cls?}], hold?:ms, click?:bool }
+     { type: "cg",        view:"...", caption?, hold?:ms }
+     { type: "cgClose"}
+     { type: "whiteFlash", to?:scene, delay?:ms }
+     { type: "phoneOpen", contacts:[...] }
      { type: "phoneClose"}
-     { type: "closeup",  view:"notebook|notebookOpen|photoJeju|cuCard:gun|..." }    // 道具特写
+     { type: "closeup",   view:"notebook|notebookOpen|card:gun|..." }
      { type: "closeupClose"}
-     { type: "sfx",      name:"alarm|page|click|knock|whoosh|buzz" }                // 音效
-     { type: "delay",    ms: 800 }
+     { type: "sfx",       name:"alarm|page|click|knock|whoosh|buzz" }
+     { type: "fn",        fn: () => {...} }
+     { type: "delay",     ms: 800 }
+     { type: "end"}
    ============================================================ */
 
 window.SCENE = {
@@ -38,20 +40,17 @@ window.SCENE = {
   beats: [],
   idx: 0,
   paused: false,
+  history: [],
+  currentChar: { who: null, expr: null },
 };
 
 SCENE.play = function(beats, startIdx = 0) {
   SCENE.beats = beats;
   SCENE.idx = startIdx;
   SCENE.paused = false;
-  SCENE.clearNarration();
+  clearSubtitle();
+  clearChoices();
   SCENE.step();
-};
-
-SCENE.clearNarration = function() {
-  $("#narration").innerHTML = "";
-  $("#choices").innerHTML = "";
-  $("#continue-hint").hidden = true;
 };
 
 SCENE.resume = function() {
@@ -66,21 +65,35 @@ SCENE.step = function() {
     SCENE.idx++;
 
     if (b.type === "place") {
-      $("#scene-place").textContent = b.name;
+      showPlace(b.name);
     }
     else if (b.type === "narration") {
-      appendNarration(b);
-      showContinueHint();
+      showSubtitle({ text: b.text, style: b.style });
+      addHistory({ kind: "narr", text: b.text, style: b.style });
       return;
     }
     else if (b.type === "dialog") {
-      appendDialog(b);
-      showContinueHint();
+      const who = b.who || "suning";
+      if (b.expr) showChar(who, b.expr);
+      else if (SCENE.currentChar.who !== who && (who === "suning" || who === "ahmo")) {
+        showChar(who, "neutral");
+      }
+      showSubtitle({ text: b.text, who });
+      addHistory({ kind: "dia", who, text: b.text });
       return;
     }
     else if (b.type === "choice") {
       renderChoices(b.options);
       return;
+    }
+    else if (b.type === "bg") {
+      switchBg(b.view);
+    }
+    else if (b.type === "show") {
+      showChar(b.who, b.expr || "neutral");
+    }
+    else if (b.type === "hide") {
+      hideChar();
     }
     else if (b.type === "delta") {
       applyDelta(b.deltas);
@@ -111,9 +124,10 @@ SCENE.step = function() {
       const target = window.SCENES[b.scene];
       if (target) { SCENE.play(target); return; }
     }
-    else if (b.type === "end")       { showContinueHint("· 完 ·", false); return; }
-
-    // —— 新 beats ——
+    else if (b.type === "end")       {
+      showSubtitle({ text: "—— 完 ——", style: "system" });
+      return;
+    }
     else if (b.type === "fade")        { runFade(b); return; }
     else if (b.type === "cg")          { runCg(b); return; }
     else if (b.type === "cgClose")     { closeCg(); }
@@ -132,36 +146,96 @@ SCENE.step = function() {
   }
 };
 
-// —— 渲染:旁白 / 对白 ——
-function appendNarration(b) {
-  const div = document.createElement("div");
-  div.className = "line";
-  const cls = b.style || "";
-  if (cls) div.innerHTML = `<span class="${cls}">${escapeHtml(b.text)}</span>`;
-  else div.textContent = b.text;
-  $("#narration").appendChild(div);
-  const stage = document.getElementById("stage");
-  stage.scrollTop = stage.scrollHeight;
+// ============================================================
+// 视图操作:背景 / 立绘 / 字幕 / 选项 / 地点角标
+// ============================================================
+function switchBg(view) {
+  const cur = document.getElementById("bg-layer");
+  const next = document.getElementById("bg-layer-next");
+  if (!view) return;
+  if (cur.dataset.view === view) return;
+  next.dataset.view = view;
+  next.hidden = false;
+  requestAnimationFrame(() => {
+    next.classList.add("show");
+    setTimeout(() => {
+      cur.dataset.view = view;
+      next.classList.remove("show");
+      next.hidden = true;
+    }, 650);
+  });
 }
-function appendDialog(b) {
-  const npc = NPCS[b.who];
-  const isSuning = b.who === "suning" || !npc;
-  const name = isSuning ? "苏宁" : npc.name;
-  const color = isSuning ? "suning" : (npc.color || "");
-  const div = document.createElement("div");
-  div.className = "line";
-  div.innerHTML = `<span class="speaker ${color}">${name}:</span> ${escapeHtml(b.text)}`;
-  $("#narration").appendChild(div);
-  const stage = document.getElementById("stage");
-  stage.scrollTop = stage.scrollHeight;
-}
-function escapeHtml(s){ return String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"})[c]); }
 
-// —— 选项 ——
+function showChar(who, expr = "neutral") {
+  const layer = document.getElementById("char-layer");
+  if (!window.PORTRAITS || !PORTRAITS[who]) {
+    // 没立绘:藏起来
+    layer.classList.remove("show");
+    SCENE.currentChar = { who, expr };
+    return;
+  }
+  layer.innerHTML = PORTRAITS[who](expr);
+  layer.classList.add("show");
+  SCENE.currentChar = { who, expr };
+}
+function hideChar() {
+  document.getElementById("char-layer").classList.remove("show");
+  SCENE.currentChar = { who: null, expr: null };
+}
+
+function showPlace(name) {
+  const el = document.getElementById("vp-place");
+  el.textContent = name;
+  el.hidden = false;
+  el.style.animation = "none";
+  void el.offsetWidth;
+  el.style.animation = "";
+}
+
+function showSubtitle({ text, who, style }) {
+  const bar = document.getElementById("subtitle-bar");
+  const sp  = document.getElementById("speaker-name");
+  const tx  = document.getElementById("subtitle-text");
+  bar.hidden = false;
+  tx.className = "subtitle-text " + (style || "");
+  if (who) {
+    const npc = NPCS && NPCS[who];
+    const name = (who === "suning") ? "苏宁" : (npc ? npc.name : who);
+    sp.textContent = name;
+    sp.className = "speaker-name " + who;
+    sp.hidden = false;
+  } else {
+    sp.hidden = true;
+  }
+  // 打字机式逐字
+  tx.textContent = "";
+  let i = 0;
+  if (SCENE._typer) clearInterval(SCENE._typer);
+  SCENE._typer = setInterval(() => {
+    if (i >= text.length) { clearInterval(SCENE._typer); SCENE._typer = null; return; }
+    tx.textContent += text[i++];
+  }, 28);
+  document.getElementById("subtitle-hint").hidden = false;
+}
+
+function clearSubtitle() {
+  document.getElementById("subtitle-bar").hidden = true;
+  document.getElementById("speaker-name").hidden = true;
+  document.getElementById("subtitle-text").textContent = "";
+  if (SCENE._typer) { clearInterval(SCENE._typer); SCENE._typer = null; }
+}
+
+function clearChoices() {
+  document.getElementById("choice-layer").hidden = true;
+  document.getElementById("choice-layer").innerHTML = "";
+}
+
+// 选项
 function renderChoices(options) {
-  $("#continue-hint").hidden = true;
-  const c = $("#choices");
+  clearSubtitle();
+  const c = document.getElementById("choice-layer");
   c.innerHTML = "";
+  c.hidden = false;
   for (const opt of options) {
     if (opt.requiresSkill && !STATE.unlockedSkills[opt.requiresSkill]) continue;
     const btn = document.createElement("button");
@@ -177,51 +251,88 @@ function renderChoices(options) {
       }).join("  ");
       if (tag) btn.innerHTML += `<span class="cost">${tag}</span>`;
     }
-    btn.onclick = () => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      clearChoices();
       if (opt.deltas) applyDelta(opt.deltas);
       if (opt.action) { opt.action(); return; }
-      if (opt.next) {
-        SCENE.beats = opt.next;
-        SCENE.idx = 0;
-        SCENE.clearNarration();
-        SCENE.step();
-      } else {
-        $("#choices").innerHTML = "";
-        SCENE.step();
-      }
+      if (opt.next) { SCENE.play(opt.next); }
+      else { SCENE.step(); }
     };
     c.appendChild(btn);
   }
 }
 
-// —— "点击继续" ——
-function showContinueHint(text = "点击继续", clickable = true) {
-  const h = $("#continue-hint");
-  h.querySelector("span").textContent = text;
-  h.hidden = false;
-  if (clickable) {
-    h.onclick = (e) => { e.stopPropagation(); h.hidden = true; SCENE.step(); };
-    $("#scene").onclick = (e) => {
-      if (e.target.closest(".choice")) return;
-      if (e.target.closest("#continue-hint")) return;
-      if ($("#continue-hint").hidden) return;
-      h.hidden = true; SCENE.step();
-    };
-  } else {
-    h.onclick = null;
-  }
+// 历史回看
+function addHistory(entry) {
+  SCENE.history.push(entry);
+  if (SCENE.history.length > 600) SCENE.history.shift();
+  document.getElementById("backlog-btn").hidden = false;
 }
 
-// ============================================================
-// 新 beats 实现
-// ============================================================
+window.toggleBacklog = function(force) {
+  const p = document.getElementById("backlog-panel");
+  const open = (typeof force === "boolean") ? force : p.hidden;
+  p.hidden = !open;
+  if (open) {
+    const body = document.getElementById("backlog-body");
+    body.innerHTML = "";
+    for (const h of SCENE.history) {
+      const div = document.createElement("div");
+      div.className = "bl-line " + (h.style || "");
+      if (h.kind === "dia") {
+        const npc = NPCS && NPCS[h.who];
+        const name = (h.who === "suning") ? "苏宁" : (npc ? npc.name : h.who);
+        div.innerHTML = `<span class="who">${name}:</span>${escapeHtml(h.text)}`;
+      } else {
+        div.textContent = h.text;
+      }
+      body.appendChild(div);
+    }
+    body.scrollTop = body.scrollHeight;
+  }
+};
 
-// —— Fade(黑屏字幕) ——
+function escapeHtml(s){ return String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"})[c]); }
+
+// ============================================================
+// 全局点击推进
+// ============================================================
+window.bindViewportAdvance = function() {
+  document.getElementById("viewport").addEventListener("click", (e) => {
+    if (e.target.closest(".choice")) return;
+    if (e.target.closest(".backlog-btn")) return;
+    if (e.target.closest(".backlog-panel")) return;
+    if (e.target.closest("#cg-layer")) return;
+    if (e.target.closest("#phone-layer")) return;
+    if (e.target.closest("#closeup-layer")) return;
+    if (e.target.closest("#modal-overlay")) return;
+    // 字幕条可见 → 推进
+    const bar = document.getElementById("subtitle-bar");
+    if (!bar.hidden) {
+      // 如果正在打字 → 跳到结尾
+      if (SCENE._typer) {
+        clearInterval(SCENE._typer);
+        const lastBeat = SCENE.beats[SCENE.idx - 1];
+        if (lastBeat && lastBeat.text != null) {
+          document.getElementById("subtitle-text").textContent = lastBeat.text;
+        }
+        SCENE._typer = null;
+        return;
+      }
+      SCENE.step();
+    }
+  });
+};
+
+// ============================================================
+// Fade(开场/结尾大字幕)
+// ============================================================
 function runFade(b) {
-  const layer = $("#cg-layer");
-  const stage = $("#cg-stage");
-  const cap   = $("#cg-caption");
-  const cont  = $("#cg-continue");
+  const layer = document.getElementById("cg-layer");
+  const stage = document.getElementById("cg-stage");
+  const cap   = document.getElementById("cg-caption");
+  const cont  = document.getElementById("cg-continue");
   layer.hidden = false;
   layer.style.background = b.bg || "#000";
   stage.innerHTML = "";
@@ -235,8 +346,7 @@ function runFade(b) {
   const done = () => {
     layer.onclick = null;
     cont.hidden = true;
-    if (b.keep) { /* 留着 */ }
-    else { layer.hidden = true; cap.hidden = true; }
+    if (!b.keep) { layer.hidden = true; cap.hidden = true; }
     SCENE.paused = false;
     SCENE.step();
   };
@@ -248,12 +358,12 @@ function runFade(b) {
   }
 }
 
-// —— CG(全屏画面 + 可选字幕) ——
+// CG 全屏(电影感特殊镜头)
 function runCg(b) {
-  const layer = $("#cg-layer");
-  const stage = $("#cg-stage");
-  const cap   = $("#cg-caption");
-  const cont  = $("#cg-continue");
+  const layer = document.getElementById("cg-layer");
+  const stage = document.getElementById("cg-stage");
+  const cap   = document.getElementById("cg-caption");
+  const cont  = document.getElementById("cg-continue");
   layer.hidden = false;
   layer.style.background = "#000";
   stage.innerHTML = renderCgView(b.view);
@@ -268,87 +378,56 @@ function runCg(b) {
   layer.onclick = () => {
     layer.onclick = null;
     cont.hidden = true;
-    if (b.keep !== true) { layer.hidden = true; }
+    if (!b.keep) { layer.hidden = true; }
     SCENE.paused = false;
     SCENE.step();
   };
   if (b.hold) setTimeout(() => { if (!layer.hidden && layer.onclick) layer.onclick(); }, b.hold);
 }
 function closeCg() {
-  const layer = $("#cg-layer");
+  const layer = document.getElementById("cg-layer");
   layer.hidden = true;
   layer.onclick = null;
-  $("#cg-continue").hidden = true;
-  $("#cg-caption").hidden = true;
-  $("#cg-stage").innerHTML = "";
+  document.getElementById("cg-continue").hidden = true;
+  document.getElementById("cg-caption").hidden = true;
+  document.getElementById("cg-stage").innerHTML = "";
 }
 
 function renderCgView(view) {
   switch (view) {
     case "bedside":
-      return `
-        <div class="cg-bedside">
-          <div class="cg-clock ringing">
-            <div class="cg-clock-face">07:23</div>
-          </div>
-        </div>
-      `;
+      return `<div class="cg-bedside"><div class="cg-clock ringing"><div class="cg-clock-face">07:23</div></div></div>`;
     case "bedsideQuiet":
-      return `
-        <div class="cg-bedside">
-          <div class="cg-clock">
-            <div class="cg-clock-face">07:24</div>
-          </div>
-        </div>
-      `;
+      return `<div class="cg-bedside"><div class="cg-clock"><div class="cg-clock-face">07:24</div></div></div>`;
     case "window":
-      return `
-        <div class="cg-window">
-          <div class="cg-fire"></div>
-          <div class="cg-window-frame"></div>
-        </div>
-      `;
+      return `<div class="cg-window"><div class="cg-fire"></div><div class="cg-window-frame"></div></div>`;
     case "mirror":
-      return `
-        <div class="cg-mirror">
-          <div class="cg-mirror-frame">
-            <div class="cg-mirror-note">周三<br>去看<br>妈</div>
-            <div class="cg-mirror-figure">
-              <div class="head"></div>
-              <div class="body"></div>
-            </div>
-          </div>
-        </div>
-      `;
+      return `<div class="cg-mirror"><div class="cg-mirror-frame">
+        <div class="cg-mirror-note">周三<br>去看<br>妈</div>
+        <div class="cg-mirror-figure"><div class="head"></div><div class="body"></div></div>
+      </div></div>`;
     case "doorHandle":
-      return `
-        <div class="cg-mirror">
-          <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-                      width:120px;height:120px;border-radius:50%;
-                      background:radial-gradient(circle at 40% 40%, #d4a857, #6a5020);
-                      box-shadow:0 0 60px rgba(212,168,87,0.6),
-                                 inset -8px -8px 20px rgba(0,0,0,0.5);"></div>
-        </div>
-      `;
+      return `<div class="cg-mirror"><div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+        width:120px;height:120px;border-radius:50%;
+        background:radial-gradient(circle at 40% 40%, #d4a857, #6a5020);
+        box-shadow:0 0 60px rgba(212,168,87,0.6), inset -8px -8px 20px rgba(0,0,0,0.5);"></div></div>`;
     default:
       return `<div style="color:#5a4540;letter-spacing:4px">[CG · ${view}]</div>`;
   }
 }
 
-// —— 白光过曝 ——
+// 白光
 function runWhiteFlash(b) {
-  const fl = $("#white-flash");
+  const fl = document.getElementById("white-flash");
   fl.hidden = false;
   requestAnimationFrame(() => fl.classList.add("on"));
   SCENE.paused = true;
   setTimeout(() => {
     if (b.to && SCENES[b.to]) {
-      // 收掉 CG/手机/特写
       closeCg(); closePhone(); closeCloseup();
       SCENE.play(SCENES[b.to]);
     } else {
-      SCENE.paused = false;
-      SCENE.step();
+      SCENE.paused = false; SCENE.step();
     }
     setTimeout(() => {
       fl.classList.remove("on");
@@ -357,28 +436,20 @@ function runWhiteFlash(b) {
   }, b.delay || 1600);
 }
 
-// ============================================================
 // 手机
-// ============================================================
 function openPhone(b) {
-  const layer = $("#phone-layer");
-  const screen = $("#phone-screen");
+  const layer = document.getElementById("phone-layer");
+  const screen = document.getElementById("phone-screen");
   layer.hidden = false;
   if (window.SFX) SFX.play("click");
-
   screen.innerHTML = renderPhoneList(b.contacts || []);
   bindPhoneList(b.contacts || []);
-
   SCENE.paused = true;
-  $("#phone-home").onclick = () => {
-    closePhone();
-    SCENE.paused = false;
-    SCENE.step();
+  document.getElementById("phone-home").onclick = () => {
+    closePhone(); SCENE.paused = false; SCENE.step();
   };
 }
-function closePhone() {
-  $("#phone-layer").hidden = true;
-}
+function closePhone() { document.getElementById("phone-layer").hidden = true; }
 function renderPhoneList(contacts) {
   const items = contacts.map((c, i) => `
     <div class="phone-contact ${c.disabled?'disabled':''}" data-i="${i}">
@@ -388,8 +459,7 @@ function renderPhoneList(contacts) {
         <div class="phone-contact-last">${escapeHtml(c.last||'')}</div>
       </div>
       <div class="phone-badge ${c.badge===0?'zero':''} ${c.badge==='?'?'q':''}">${c.badge==null?'':c.badge}</div>
-    </div>
-  `).join("");
+    </div>`).join("");
   return `
     <div class="phone-status">
       <span class="nosig">无信号</span>
@@ -397,8 +467,7 @@ function renderPhoneList(contacts) {
       <span>32%</span>
     </div>
     <div class="phone-app-title">微信</div>
-    ${items}
-  `;
+    ${items}`;
 }
 function bindPhoneList(contacts) {
   document.querySelectorAll(".phone-contact").forEach(el => {
@@ -406,146 +475,84 @@ function bindPhoneList(contacts) {
       const i = +el.dataset.i;
       const c = contacts[i];
       if (c.disabled) {
-        // 妈 — 震动一下,不开
         const frame = document.querySelector(".phone-frame");
         frame.classList.remove("phone-shake");
         void frame.offsetWidth;
         frame.classList.add("phone-shake");
         if (window.SFX) SFX.play("buzz");
-        // 触发独白
         if (c.onTap && SCENES[c.onTap]) {
           setTimeout(() => {
-            closePhone();
-            SCENE.paused = false;
+            closePhone(); SCENE.paused = false;
             SCENE.play(SCENES[c.onTap]);
           }, 700);
         }
         return;
       }
-      // 打开聊天
-      const screen = $("#phone-screen");
-      screen.innerHTML = renderPhoneChat(c, contacts);
-      $("#phone-screen .phone-back").onclick = () => {
+      const screen = document.getElementById("phone-screen");
+      screen.innerHTML = renderPhoneChat(c);
+      document.querySelector("#phone-screen .phone-back").onclick = () => {
         screen.innerHTML = renderPhoneList(contacts);
         bindPhoneList(contacts);
       };
-      if (c.onOpen && SCENES[c.onOpen]) {
-        // 看完后自动返回主线
-        setTimeout(() => {
-          closePhone();
-          SCENE.paused = false;
-          SCENE.play(SCENES[c.onOpen]);
-        }, 100); // 这里不自动跳,先让玩家看
-      }
     };
   });
 }
-function renderPhoneChat(c, contacts) {
+function renderPhoneChat(c) {
   const msgs = (c.messages||[]).map(m => {
     if (m.time) return `<div class="phone-msg-time">${escapeHtml(m.time)}</div>`;
     return `<div class="phone-msg ${m.from==='me'?'me':'them'}">${escapeHtml(m.text)}</div>`;
   }).join("");
   const empty = (c.messages||[]).length === 0
-    ? `<div class="phone-empty">${escapeHtml(c.empty || '空的。\n你们没有聊天记录。')}</div>`
-    : "";
+    ? `<div class="phone-empty">${escapeHtml(c.empty || '空的。\n你们没有聊天记录。')}</div>` : "";
   return `
     <div class="phone-chat-head">
       <span class="phone-back">← 返回</span>
       <span class="phone-chat-name">${escapeHtml(c.name)}</span>
     </div>
-    ${empty}${msgs}
-  `;
+    ${empty}${msgs}`;
 }
 
-// ============================================================
 // 道具特写
-// ============================================================
 function runCloseup(b) {
-  const layer = $("#closeup-layer");
-  const stage = $("#closeup-stage");
+  const layer = document.getElementById("closeup-layer");
+  const stage = document.getElementById("closeup-stage");
   layer.hidden = false;
   stage.innerHTML = renderCloseupView(b.view, b);
   if (window.SFX) SFX.play(b.sfx || "page");
-
   SCENE.paused = true;
-  $("#closeup-back").textContent = b.backText || "放回去";
-  $("#closeup-back").onclick = () => {
-    closeCloseup();
-    SCENE.paused = false;
-    SCENE.step();
+  document.getElementById("closeup-back").textContent = b.backText || "放回去";
+  document.getElementById("closeup-back").onclick = () => {
+    closeCloseup(); SCENE.paused = false; SCENE.step();
   };
 }
 function closeCloseup() {
-  $("#closeup-layer").hidden = true;
-  $("#closeup-stage").innerHTML = "";
+  document.getElementById("closeup-layer").hidden = true;
+  document.getElementById("closeup-stage").innerHTML = "";
 }
 function renderCloseupView(view, b) {
-  if (view === "notebookCover") {
-    return `
-      <div class="cu-notebook">
-        <div class="nb-cover-title">残光社案件登记本<br>· 2031 ·</div>
-      </div>
-    `;
-  }
-  if (view === "notebookOpen") {
-    return `
-      <div class="cu-notebook opened">
-        <div class="nb-line">「我又开始了。」</div>
-      </div>
-    `;
-  }
-  if (view === "notebookPhoto") {
-    return `
-      <div class="cu-notebook opened">
-        <div class="nb-photo">
-          <div class="nb-figure left"></div>
-          <div class="nb-figure right"></div>
-        </div>
-        <div class="nb-cap">背面手写:"2028 春,济州岛"</div>
-      </div>
-    `;
-  }
+  if (view === "notebookCover") return `<div class="cu-notebook"><div class="nb-cover-title">残光社案件登记本<br>· 2031 ·</div></div>`;
+  if (view === "notebookOpen")  return `<div class="cu-notebook opened"><div class="nb-line">「我又开始了。」</div></div>`;
+  if (view === "notebookPhoto") return `<div class="cu-notebook opened">
+    <div class="nb-photo"><div class="nb-figure left"></div><div class="nb-figure right"></div></div>
+    <div class="nb-cap">背面手写:"2028 春,济州岛"</div></div>`;
   if (view && view.startsWith("card:")) {
     const k = view.slice(5);
     const data = CLOSEUP_CARDS[k];
     if (!data) return `<div style="color:#5a4540">[未知卡:${k}]</div>`;
-    return `
-      <div class="cu-card">
-        <div class="cu-icon">${data.icon}</div>
-        <div class="cu-name">${escapeHtml(data.name)}</div>
-        <div class="cu-desc">${escapeHtml(data.desc)}</div>
-        <div class="cu-mono">${escapeHtml(data.mono)}</div>
-      </div>
-    `;
+    return `<div class="cu-card">
+      <div class="cu-icon">${data.icon}</div>
+      <div class="cu-name">${escapeHtml(data.name)}</div>
+      <div class="cu-desc">${escapeHtml(data.desc)}</div>
+      <div class="cu-mono">${escapeHtml(data.mono)}</div>
+    </div>`;
   }
   return `<div style="color:#5a4540">[特写 · ${view}]</div>`;
 }
 
-// —— 铝盒里物品的卡片 ——
 window.CLOSEUP_CARDS = {
-  cashEm: {
-    icon: "💴", name: "应急金",
-    desc: "几张末日货币 · 红色印章",
-    mono: "我每个月都补一点。\n万一......再死一次。"
-  },
-  gun: {
-    icon: "🔫", name: "小型手枪",
-    desc: "黑色 · 有磨损",
-    mono: "我没用过。\n但我留着。\n他们如果再来......"
-  },
-  photoLisa: {
-    icon: "📸", name: "陈志强 + Lisa",
-    desc: "他们在那家婚纱店前拍的婚纱照",
-    mono: "那家婚纱店,\n现在烧着。\n我有时候觉得,\n是我心里那把火,点燃了它。"
-  },
-  deathCert: {
-    icon: "📜", name: "死亡证明",
-    desc: "我的 · 2034 年 8 月 23 日 · 签名:陈志强",
-    mono: "那是上一世。\n这一世,我还没死。\n还。"
-  },
-  letterMom: {
-    icon: "✉️", name: "写给妈妈的信",
-    desc: "只有三个字",
-    mono: "「妈,我...」\n(写不下去。)"
-  },
+  cashEm:    { icon:"💴", name:"应急金",  desc:"几张末日货币 · 红色印章", mono:"我每个月都补一点。\n万一......再死一次。" },
+  gun:       { icon:"🔫", name:"小型手枪", desc:"黑色 · 有磨损",         mono:"我没用过。\n但我留着。\n他们如果再来......" },
+  photoLisa: { icon:"📸", name:"陈志强 + Lisa", desc:"他们在那家婚纱店前拍的婚纱照", mono:"那家婚纱店,\n现在烧着。\n我有时候觉得,\n是我心里那把火,点燃了它。" },
+  deathCert: { icon:"📜", name:"死亡证明", desc:"我的 · 2034 年 8 月 23 日 · 签名:陈志强", mono:"那是上一世。\n这一世,我还没死。\n还。" },
+  letterMom: { icon:"✉️", name:"写给妈妈的信", desc:"只有三个字", mono:"「妈,我...」\n(写不下去。)" },
 };
