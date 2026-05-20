@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>末日侦探社 · Day 1</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app" class="app">
+
+  <!-- 顶部状态栏(常驻) -->
+  <header class="topbar" id="topbar">
+    <div class="tb-left">
+      <span class="tb-time" id="tb-time">06:42</span>
+      <span class="tb-sep">·</span>
+      <span class="tb-day" id="tb-day">Day 1 · 第 7 劫</span>
+      <span class="tb-sep">·</span>
+      <span class="tb-weather" id="tb-weather">阴天</span>
+    </div>
+    <div class="tb-right">
+      <button class="tb-bell" id="tb-bell" aria-label="通知">
+        <span class="bell-icon">🔔</span>
+        <span class="bell-count" id="bell-count">0</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 主场景区 -->
+  <main class="stage" id="stage">
+
+    <!-- 剧情/对话渲染区 -->
+    <div class="scene" id="scene">
+      <div class="scene-place" id="scene-place">主角公寓 · 卧室</div>
+      <div class="narration" id="narration"></div>
+      <div class="choices" id="choices"></div>
+      <div class="continue-hint" id="continue-hint" hidden>
+        <span>点击继续</span>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- 底部按钮栏(常驻) -->
+  <nav class="bottombar" id="bottombar">
+    <button class="bb-btn" data-panel="inventory">
+      <span class="bb-ico">💼</span><span class="bb-lbl">背包</span>
+    </button>
+    <button class="bb-btn" data-panel="cases">
+      <span class="bb-ico">📋</span><span class="bb-lbl">案件</span>
+    </button>
+    <button class="bb-btn" data-panel="map">
+      <span class="bb-ico">🗺</span><span class="bb-lbl">地图</span>
+    </button>
+    <button class="bb-btn" data-panel="me">
+      <span class="bb-ico">👤</span><span class="bb-lbl">我</span>
+    </button>
+  </nav>
+
+  <!-- 右上数值浮窗 -->
+  <div class="delta-stack" id="delta-stack"></div>
+
+  <!-- 通知抽屉 -->
+  <div class="bell-drawer" id="bell-drawer" hidden>
+    <div class="drawer-head">待办与提醒</div>
+    <ul class="drawer-list" id="drawer-list"></ul>
+  </div>
+
+  <!-- 面板遮罩(背包/案件/地图/我) -->
+  <div class="panel-overlay" id="panel-overlay" hidden>
+    <div class="panel" id="panel">
+      <header class="panel-head">
+        <span class="panel-title" id="panel-title">背包</span>
+        <button class="panel-close" id="panel-close">×</button>
+      </header>
+      <div class="panel-body" id="panel-body"></div>
+    </div>
+  </div>
+
+  <!-- 解锁/系统弹窗 -->
+  <div class="modal-overlay" id="modal-overlay" hidden>
+    <div class="modal" id="modal">
+      <div class="modal-tag" id="modal-tag">🔓 新玩法解锁</div>
+      <div class="modal-title" id="modal-title"></div>
+      <div class="modal-body" id="modal-body"></div>
+      <button class="modal-ok" id="modal-ok">我知道了</button>
+    </div>
+  </div>
+
+  <!-- 全屏 CG 层(开场字幕 / 镜子 / 推门白光 / 床头特写) -->
+  <div class="cg-layer" id="cg-layer" hidden>
+    <div class="cg-stage" id="cg-stage"></div>
+    <div class="cg-caption" id="cg-caption" hidden></div>
+    <div class="cg-continue" id="cg-continue" hidden>点击继续</div>
+  </div>
+
+  <!-- 手机 UI 层 -->
+  <div class="phone-layer" id="phone-layer" hidden>
+    <div class="phone-frame">
+      <div class="phone-screen" id="phone-screen"></div>
+      <div class="phone-home" id="phone-home">收起手机</div>
+    </div>
+  </div>
+
+  <!-- 道具特写层(笔记本 / 照片 / 铝盒) -->
+  <div class="closeup-layer" id="closeup-layer" hidden>
+    <div class="closeup-stage" id="closeup-stage"></div>
+    <div class="closeup-back" id="closeup-back">放回去</div>
+  </div>
+
+  <!-- 白光过曝(推门) -->
+  <div class="white-flash" id="white-flash" hidden></div>
+
+  <!-- 老电影颗粒 -->
+  <div class="grain"></div>
+
+</div>
+
+<script src="js/audio.js"></script>
+<script src="js/data.js"></script>
+<script src="js/state.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/scene.js"></script>
+<script src="js/scenes.js"></script>
+<script src="js/main.js"></script>
+
+</body>
+</html>
