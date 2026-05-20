@@ -65,13 +65,12 @@ SCENES.S1_tutorial = [
   { type: "bg", view: "bedroom" },
   { type: "narration", style: "think", text: "(关节像生锈的合页。你坐起来。)" },
 
-  { type: "unlock",
-    tag: "📖 怎么玩",
-    title: "Day 1 · 早晨",
-    body: "▸ 房间里能互动的东西,鼠标移上去会发光。\n▸ 点一下,它就会发生一段戏。\n▸ 看够 3 件东西,你才会有「该开始今天了」的感觉。\n▸ 然后会进入公寓主屏 — 那里有菜园 / 净水 / 工作台 / 邻居 / 防守。" },
-
-  // ★ 标记:正在 morning 探索
-  { type: "fn", fn: () => { STATE.flags.morning_exploring = true; ROOM.enter("bedroom"); } },
+  // ★ 不再强制看物品 — 直接进公寓,想看再看
+  { type: "fn", fn: () => {
+    STATE.flags.morning_exploring = false;
+    WORLD.setTime(7, 30);
+    APT.show();
+  }},
 ];
 
 // 兼容旧入口
